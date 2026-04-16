@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* IRMS Brand Colors */
+  --color-irms-green: #1a4035;
+  --color-irms-green-dark: #0f2a22;
+  --color-irms-green-light: #2d5c4e;
+  --color-irms-green-muted: #234c3e;
+  --color-irms-orange: #f97316;
+  --color-irms-orange-light: #fb923c;
+  --color-irms-surface: #f3f4f2;
+  --color-irms-surface-card: #ffffff;
+  --color-irms-border: #e5e7e4;
+  --color-irms-text-primary: #111827;
+  --color-irms-text-secondary: #6b7280;
+  --color-irms-text-muted: #9ca3af;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #f3f4f2;
+  --foreground: #111827;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
