@@ -1,17 +1,6 @@
-/**
- * TableDiagram – SVG-based visual representation of a restaurant table with chairs.
- *
- * Layout strategy per capacity:
- *  2 → 1 chair top, 1 chair bottom
- *  4 → 1 top, 1 bottom, 1 left, 1 right
- *  6 → 2 top, 2 bottom, 1 left, 1 right
- *  8 → 2 top, 2 bottom, 2 left, 2 right
- */
-
 type SupportedCapacity = 2 | 4 | 6 | 8;
 
 interface Chair {
-  /** cx, cy = center of chair rectangle */
   x: number;
   y: number;
   width: number;
@@ -20,41 +9,31 @@ interface Chair {
 }
 
 interface TableDiagramProps {
-  /** Total seat capacity – must be 2, 4, 6, or 8 */
   capacity: SupportedCapacity;
-  /** Number of guests currently seated (determines orange chairs) */
   guests: number;
-  /** Optional extra className for the wrapper */
   className?: string;
 }
 
-// ─── Layout constants ────────────────────────────────────────────────────────
 const SVG_W = 120;
 const SVG_H = 120;
 
 const TABLE_X = 30;
 const TABLE_Y = 30;
-const TABLE_W = SVG_W - TABLE_X * 2; // 60
-const TABLE_H = SVG_H - TABLE_Y * 2; // 60
+const TABLE_W = SVG_W - TABLE_X * 2;
+const TABLE_H = SVG_H - TABLE_Y * 2;
 
-const CHAIR_SHORT = 12; // chair side perpendicular to the table edge
-const CHAIR_LONG = 16;  // chair side parallel to the table edge
-const CHAIR_GAP = 5;    // gap between table edge and chair
-const CHAIR_RX = 3;     // corner radius
+const CHAIR_SHORT = 12;
+const CHAIR_LONG = 16;
+const CHAIR_GAP = 5;
+const CHAIR_RX = 3;
 
-/**
- * Build an ordered list of chair bounding-box data for a given capacity.
- * Chairs are ordered: top-left→top-right, right-top→right-bottom,
- * bottom-right→bottom-left, left-bottom→left-top (clockwise).
- */
 function buildChairs(capacity: SupportedCapacity): Chair[] {
   const chairs: Chair[] = [];
 
-  // How many chairs per side
   const topBottom = capacity <= 4 ? 1 : 2;
-  const leftRight = capacity === 2 ? 0 : capacity === 4 ? 1 : 2;
+  const leftRight =
+    capacity === 2 ? 0 : capacity === 4 ? 1 : capacity === 6 ? 1 : 2;
 
-  // ── Top side ──────────────────────────────────────────────────────────────
   for (let i = 0; i < topBottom; i++) {
     const totalWidth = topBottom * CHAIR_LONG + (topBottom - 1) * 4;
     const startX = TABLE_X + (TABLE_W - totalWidth) / 2 + i * (CHAIR_LONG + 4);
@@ -67,7 +46,6 @@ function buildChairs(capacity: SupportedCapacity): Chair[] {
     });
   }
 
-  // ── Right side ────────────────────────────────────────────────────────────
   for (let i = 0; i < leftRight; i++) {
     const totalHeight = leftRight * CHAIR_LONG + (leftRight - 1) * 4;
     const startY = TABLE_Y + (TABLE_H - totalHeight) / 2 + i * (CHAIR_LONG + 4);
@@ -80,9 +58,6 @@ function buildChairs(capacity: SupportedCapacity): Chair[] {
     });
   }
 
-  // ── Bottom side ───────────────────────────────────────────────────────────
-  // Reverse order (right to left) so the clockwise indexing keeps the
-  // "paired" feel with the top chairs.
   for (let i = topBottom - 1; i >= 0; i--) {
     const totalWidth = topBottom * CHAIR_LONG + (topBottom - 1) * 4;
     const startX = TABLE_X + (TABLE_W - totalWidth) / 2 + i * (CHAIR_LONG + 4);
@@ -95,7 +70,6 @@ function buildChairs(capacity: SupportedCapacity): Chair[] {
     });
   }
 
-  // ── Left side ─────────────────────────────────────────────────────────────
   for (let i = leftRight - 1; i >= 0; i--) {
     const totalHeight = leftRight * CHAIR_LONG + (leftRight - 1) * 4;
     const startY = TABLE_Y + (TABLE_H - totalHeight) / 2 + i * (CHAIR_LONG + 4);
@@ -111,14 +85,13 @@ function buildChairs(capacity: SupportedCapacity): Chair[] {
   return chairs;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
 export default function TableDiagram({
   capacity,
   guests,
   className = "",
 }: TableDiagramProps) {
   const safeCapacity: SupportedCapacity = ([2, 4, 6, 8] as const).includes(
-    capacity as SupportedCapacity
+    capacity as SupportedCapacity,
   )
     ? (capacity as SupportedCapacity)
     : 4;
