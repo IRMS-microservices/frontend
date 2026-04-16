@@ -4,7 +4,8 @@ import { Topbar } from "@/components/shared/Topbar";
 import Link from "next/link";
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { UsersRound, UtensilsCrossed } from "lucide-react";
+import { UsersRound } from "lucide-react";
+import TableDiagram from "@/components/app/table/TableDiagram";
 import AssignGuestModal from "@/components/app/table/AssignGuestModal";
 import { CustomerInfoModal } from "@/components/app/table/CustomerInfoModal";
 
@@ -146,21 +147,9 @@ export default function TableDetailPage() {
           <div className="bg-white rounded-2xl border border-irms-border flex flex-col items-center justify-center py-16 px-8 text-center">
             {tableState === "empty" ? (
               <>
-                {/* Empty chair icon */}
-                <div className="w-20 h-20 rounded-2xl bg-irms-bg-secondary flex items-center justify-center mb-5">
-                  <svg
-                    width="36"
-                    height="36"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#9ca3af"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="5" y="2" width="14" height="12" rx="2" />
-                    <path d="M5 10H3a2 2 0 0 0-2 2v8h2v-4h18v4h2v-8a2 2 0 0 0-2-2h-2" />
-                  </svg>
+                {/* Table diagram – empty */}
+                <div className="w-28 h-28 mb-5">
+                  <TableDiagram capacity={4} guests={0} />
                 </div>
                 <h3 className="text-2xl font-bold text-irms-text-primary mb-2">
                   Table is Empty
@@ -193,16 +182,16 @@ export default function TableDetailPage() {
               </>
             ) : (
               <>
-                {/* Assigned icon */}
-                <div className="w-20 h-20 rounded-2xl bg-irms-bg-secondary flex items-center justify-center mb-5">
-                  <UtensilsCrossed size={60} />
+                {/* Table diagram – assigned */}
+                <div className="w-48 h-48 mb-5">
+                  <TableDiagram capacity={4} guests={guest?.partySize ?? 0} />
                 </div>
                 <h3 className="text-xl font-bold text-irms-text-primary mb-8">
                   <span className="text-irms-green">Table {tableId}</span> has
                   been assigned to the customer
                 </h3>
 
-                <div className="w-full max-w-sm space-y-3">
+                <div className="w-full max-w-lg flex gap-3">
                   <Link
                     href={`/server/tables/${tableId}/payment`}
                     className="flex items-center justify-center gap-2 w-full bg-linear-to-r from-irms-green-dark to-irms-green-light cursor-pointer duration-500

@@ -2,6 +2,7 @@ import { Topbar } from "@/components/shared/Topbar";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { UsersRound } from "lucide-react";
+import TableDiagram from "@/components/app/table/TableDiagram";
 
 export const metadata: Metadata = {
   title: "Table & Order — IRMS",
@@ -12,6 +13,8 @@ type TableStatus = "available" | "occupied" | "waiting";
 interface TableData {
   id: number;
   seats: number;
+  /** Guests currently seated at this table */
+  seatedGuests?: number;
   status: TableStatus;
   time?: string;
   guest?: string;
@@ -19,35 +22,38 @@ interface TableData {
 }
 
 const TABLES: TableData[] = [
-  { id: 1, seats: 4, status: "available" },
+  { id: 1, seats: 4, seatedGuests: 0, status: "available" },
   {
     id: 5,
     seats: 2,
+    seatedGuests: 2,
     status: "occupied",
     time: "42M",
     guest: "Mr. Sterling Archer",
     hasAlert: true,
   },
-  { id: 12, seats: 6, status: "available" },
+  { id: 12, seats: 6, seatedGuests: 0, status: "available" },
   {
     id: 8,
     seats: 4,
+    seatedGuests: 3,
     status: "occupied",
     time: "1H 15M",
     guest: "Dr. Linda Watson",
     hasAlert: true,
   },
-  { id: 2, seats: 4, status: "available" },
+  { id: 2, seats: 4, seatedGuests: 0, status: "available" },
   {
     id: 10,
     seats: 2,
+    seatedGuests: 2,
     status: "occupied",
     time: "1H 15M",
     guest: "Ms. Elena Gilbert",
     hasAlert: true,
   },
-  { id: 3, seats: 4, status: "available" },
-  { id: 4, seats: 4, status: "waiting", time: "12M", guest: "Mr. David Chou" },
+  { id: 3, seats: 4, seatedGuests: 0, status: "available" },
+  { id: 4, seats: 4, seatedGuests: 2, status: "waiting", time: "12M", guest: "Mr. David Chou" },
 ];
 
 const STATUS_STYLES: Record<
@@ -118,8 +124,18 @@ export default function TablesPage() {
                     )}
                   </div>
 
+                  {/* Table diagram */}
+                  <div className="flex justify-center my-3">
+                    <div className="w-[88px] h-[88px]">
+                      <TableDiagram
+                        capacity={table.seats as 2 | 4 | 6 | 8}
+                        guests={table.seatedGuests ?? 0}
+                      />
+                    </div>
+                  </div>
+
                   {/* Guest name */}
-                  <p className="font-semibold text-irms-text-primary mb-4">
+                  <p className="font-semibold text-irms-text-primary mb-4 truncate">
                     {table.guest ?? "Ready for Service"}
                   </p>
 
