@@ -1,19 +1,18 @@
+"use client";
+
 import { Topbar } from "@/components/shared/Topbar";
 import Link from "next/link";
-import type { Metadata } from "next";
+import { useEffect, useState } from "react";
 import { UsersRound } from "lucide-react";
 import TableDiagram from "@/components/app/table/TableDiagram";
-
-export const metadata: Metadata = {
-  title: "Table & Order — IRMS",
-};
+import { OrderService } from "@/services/order.service";
+import { MOCK_TABLES } from "@/app/api/mockData";
 
 type TableStatus = "available" | "occupied" | "waiting";
 
 interface TableData {
   id: number;
   seats: number;
-  /** Guests currently seated at this table */
   seatedGuests?: number;
   status: TableStatus;
   time?: string;
@@ -21,50 +20,11 @@ interface TableData {
   hasAlert?: boolean;
 }
 
-const TABLES: TableData[] = [
-  { id: 1, seats: 4, seatedGuests: 0, status: "available" },
-  {
-    id: 5,
-    seats: 2,
-    seatedGuests: 2,
-    status: "occupied",
-    time: "42M",
-    guest: "Mr. Sterling Archer",
-    hasAlert: true,
-  },
-  { id: 12, seats: 6, seatedGuests: 0, status: "available" },
-  {
-    id: 8,
-    seats: 4,
-    seatedGuests: 3,
-    status: "occupied",
-    time: "1H 15M",
-    guest: "Dr. Linda Watson",
-    hasAlert: true,
-  },
-  { id: 2, seats: 4, seatedGuests: 0, status: "available" },
-  {
-    id: 10,
-    seats: 2,
-    seatedGuests: 2,
-    status: "occupied",
-    time: "1H 15M",
-    guest: "Ms. Elena Gilbert",
-    hasAlert: true,
-  },
-  { id: 3, seats: 4, seatedGuests: 0, status: "available" },
-  { id: 4, seats: 4, seatedGuests: 2, status: "waiting", time: "12M", guest: "Mr. David Chou" },
-];
-
 const STATUS_STYLES: Record<
   TableStatus,
   { dot: string; label: string; text: string }
 > = {
-  available: {
-    dot: "bg-green-400",
-    label: "AVAILABLE",
-    text: "text-green-600",
-  },
+  available: { dot: "bg-green-400", label: "AVAILABLE", text: "text-green-600" },
   occupied: { dot: "bg-red-500", label: "OCCUPIED", text: "text-red-600" },
   waiting: { dot: "bg-gray-400", label: "WAITING", text: "text-gray-500" },
 };
@@ -76,83 +36,120 @@ const NUM_STYLES: Record<TableStatus, string> = {
 };
 
 export default function TablesPage() {
-  const emptyCount = TABLES.filter((t) => t.status === "available").length;
-  const waitingCount = TABLES.filter((t) => t.status === "waiting").length;
-  const occupiedGuests =
-    TABLES.filter((t) => t.status === "occupied").length * 2; // approx
+  const [tables, setTables] = useState<TableData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTablesAndOrders = async () => {
+      try {
+        const orders = await OrderService.getOrders();
+        
+        const dynamicTables: TableData[] = MOCK_TABLES.map(baseTable => {
+          const activeOrder = orders.find(o => 
+            o.tableId === baseTable.id && 
+            (o.serviceStatus === 'Waiting' || o.serviceStatus === 'Eating')
+          );
+
+          if (activeOrder) {
+            return {
+              id: baseTable.id,
+              seats: baseTable.seats,
+              seatedGuests: 2, 
+              status: activeOrder.serviceStatus === 'Waiting' ? 'waiting' : 'occupied',
+              time: "Active", 
+              guest: activeOrder.note ? `Note: ${activeOrder.note}` : `Customer #${activeOrder.customerId}`,
+              hasAlert: activeOrder.serviceStatus === 'Waiting'
+            };
+          } else {
+            return {
+              id: baseTable.id,
+              seats: baseTable.seats,
+              seatedGuests: 0,
+              status: "available"
+            };
+          }
+        });
+
+        setTables(dynamicTables);
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to fetch orders:", error);
+        setLoading(false);
+      }
+    };
+
+    fetchTablesAndOrders();
+    const interval = setInterval(fetchTablesAndOrders, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const emptyCount = tables.filter((t) => t.status === "available").length;
+  const waitingCount = tables.filter((t) => t.status === "waiting").length;
+  const occupiedGuests = tables.filter((t) => t.status === "occupied").length * 2; 
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top bar */}
       <Topbar title="Table & Order" />
 
-      {/* Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Table grid */}
         <div className="flex-1 p-8 overflow-y-auto">
-          <div className="grid grid-cols-3 gap-4">
-            {TABLES.map((table) => {
-              const s = STATUS_STYLES[table.status];
-              return (
-                <div
-                  key={table.id}
-                  className="bg-white rounded-xl border border-irms-border p-5 relative hover:shadow-md transition-shadow"
-                >
-                  {/* Table number + seats */}
-                  <div className="flex items-start justify-between mb-3">
-                    <span
-                      className={`text-3xl font-bold ${NUM_STYLES[table.status]}`}
-                    >
-                      {String(table.id).padStart(2, "0")}
-                    </span>
-                    <span className="flex items-center gap-1 text-xs text-irms-text-muted">
-                      <UsersRound className="w-4 h-4" />
-                      {table.seats} Seats
-                    </span>
-                  </div>
-
-                  {/* Status */}
+          {loading ? (
+            <div className="flex justify-center items-center h-64 text-irms-text-muted">Loading tables...</div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              {tables.map((table) => {
+                const s = STATUS_STYLES[table.status];
+                return (
                   <div
-                    className={`flex items-center gap-1.5 text-xs font-semibold tracking-wider ${s.text} mb-1`}
+                    key={table.id}
+                    className="bg-white rounded-xl border border-irms-border p-5 relative hover:shadow-md transition-shadow"
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                    {s.label}
-                    {table.time && (
-                      <span className="text-irms-text-muted font-normal ml-1">
-                        • {table.time}
+                    <div className="flex items-start justify-between mb-3">
+                      <span className={`text-3xl font-bold ${NUM_STYLES[table.status]}`}>
+                        {String(table.id).padStart(2, "0")}
                       </span>
-                    )}
-                  </div>
-
-                  {/* Table diagram */}
-                  <div className="flex justify-center my-3">
-                    <div className="w-[88px] h-[88px]">
-                      <TableDiagram
-                        capacity={table.seats as 2 | 4 | 6 | 8}
-                        guests={table.seatedGuests ?? 0}
-                      />
+                      <span className="flex items-center gap-1 text-xs text-irms-text-muted">
+                        <UsersRound className="w-4 h-4" />
+                        {table.seats} Seats
+                      </span>
                     </div>
+
+                    <div className={`flex items-center gap-1.5 text-xs font-semibold tracking-wider ${s.text} mb-1`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                      {s.label}
+                      {table.time && (
+                        <span className="text-irms-text-muted font-normal ml-1">
+                          • {table.time}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-center my-3">
+                      <div className="w-[88px] h-[88px]">
+                        <TableDiagram
+                          capacity={table.seats as 2 | 4 | 6 | 8}
+                          guests={table.seatedGuests ?? 0}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="font-semibold text-irms-text-primary mb-4 truncate text-sm">
+                      {table.guest ?? "Ready for Service"}
+                    </p>
+
+                    <Link
+                      href={`/server/tables/${table.id}`}
+                      className="block text-center text-xs font-bold tracking-widest text-white bg-linear-to-r from-irms-green to-irms-green/80 hover:from-irms-green/80 hover:to-irms-green py-2.5 px-4 rounded-lg transition-colors duration-300"
+                    >
+                      MANAGE TABLE
+                    </Link>
                   </div>
-
-                  {/* Guest name */}
-                  <p className="font-semibold text-irms-text-primary mb-4 truncate">
-                    {table.guest ?? "Ready for Service"}
-                  </p>
-
-                  {/* CTA */}
-                  <Link
-                    href={`/server/tables/${table.id}`}
-                    className="block text-center text-xs font-bold tracking-widest text-white bg-linear-to-r from-irms-green to-irms-green/80 hover:from-irms-green/80 hover:to-irms-green py-2.5 px-4 rounded-lg transition-colors duration-300"
-                  >
-                    MANAGE TABLE
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Service overview sidebar */}
         <div className="w-[350px] shrink-0 bg-white border-l border-irms-border p-6">
           <h2 className="text-xs font-bold text-irms-text-muted tracking-widest uppercase mb-5">
             Service Overview
@@ -188,18 +185,17 @@ export default function TablesPage() {
             </div>
           </div>
 
-          {/* Capacity */}
           <div>
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-[#374151]">Daily Capacity</span>
               <span className="text-sm font-bold text-irms-text-primary">
-                82%
+                {Math.round(((MOCK_TABLES.length - emptyCount) / MOCK_TABLES.length) * 100)}%
               </span>
             </div>
             <div className="h-2 bg-irms-surface rounded-full overflow-hidden">
               <div
-                className="h-full bg-irms-green rounded-full"
-                style={{ width: "82%" }}
+                className="h-full bg-irms-green rounded-full transition-all duration-500"
+                style={{ width: `${Math.round(((MOCK_TABLES.length - emptyCount) / MOCK_TABLES.length) * 100)}%` }}
               />
             </div>
           </div>
