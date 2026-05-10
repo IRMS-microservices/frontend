@@ -2,14 +2,51 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { AuthService } from "@/services/auth.service";
 import { IrmsLogo } from "@/components/shared/IrmsLogo";
 
 type Station = "ADMIN" | "SERVER" | "KITCHEN";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [station, setStation] = useState<Station>("SERVER");
   const [showPassword, setShowPassword] = useState(false);
   const [trustTerminal, setTrustTerminal] = useState(false);
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async () => {
+    setError("");
+    setIsLoading(true);
+    try {
+      const response = await AuthService.login({ username, password });
+      if (response.success) {
+        if (response.data && response.data.token) {
+          localStorage.setItem("token", response.data.token);
+        }
+        // Redirect based on station or to default
+        if (station === "ADMIN") {
+          router.push("/admin/dashboard"); // Adjust as needed
+        } else if (station === "KITCHEN") {
+          router.push("/kitchen/orders"); // Adjust as needed
+        } else {
+          router.push("/server/tables");
+        }
+      } else {
+        setError(response.message || "Login failed");
+      }
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message || "An error occurred during login",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-irms-green relative overflow-hidden">
@@ -148,6 +185,8 @@ export default function LoginPage() {
                 id="staff-id"
                 type="text"
                 placeholder="curator_staff_01"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="flex-1 bg-transparent text-sm text-irms-text-primary placeholder-irms-text-muted outline-none"
               />
             </div>
@@ -184,6 +223,8 @@ export default function LoginPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="flex-1 bg-transparent text-sm text-irms-text-primary placeholder-irms-text-muted outline-none"
               />
               <button
@@ -254,28 +295,39 @@ export default function LoginPage() {
             </span>
           </label>
 
+          {error && (
+            <div className="mb-4 text-red-500 text-sm font-semibold text-center">
+              {error}
+            </div>
+          )}
+
           {/* Sign In button */}
-          <Link
-            href="/server/tables"
+          <button
             id="sign-in-btn"
-            className="flex items-center justify-center gap-2 w-full bg-linear-to-r from-irms-green to-irms-green-light cursor-pointer duration-500
-                              hover:bg-linear-to-r hover:from-irms-green-light hover:to-irms-green text-white font-semibold py-3 px-6 rounded-xl transition-colors mb-6 text-sm"
+            onClick={handleLogin}
+            disabled={isLoading}
+            className={`flex items-center justify-center gap-2 w-full bg-linear-to-r from-irms-green to-irms-green-light cursor-pointer duration-500
+                              hover:bg-linear-to-r hover:from-irms-green-light hover:to-irms-green text-white font-semibold py-3 px-6 rounded-xl transition-colors mb-6 text-sm ${
+                                isLoading ? "opacity-70 cursor-not-allowed" : ""
+                              }`}
           >
-            Sign In
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          </Link>
+            {isLoading ? "Signing in..." : "Sign In"}
+            {!isLoading && (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            )}
+          </button>
 
           <p className="text-center text-sm text-irms-text-secondary">
             New to the collection?{" "}
