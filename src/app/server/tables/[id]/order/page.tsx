@@ -2,9 +2,12 @@
 
 import { Topbar } from "@/components/shared/Topbar";
 import Link from "next/link";
-import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useState, useEffect, use } from "react";
 import { ShoppingCart, Flame } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MenuService } from "@/services/menu.service";
+import { OrderService } from "@/services/order.service";
+import { DishCategory, DishResponse } from "@/types/api.types";
 
 type Category = "APPETIZERS" | "MAIN COURSE" | "DRINKS" | "DESSERTS";
 
@@ -16,126 +19,90 @@ interface MenuItem {
   status: "IN STOCK" | "SOLD OUT";
   tag?: string;
   image: string;
+  originalDish: DishResponse;
 }
 
 interface CartItem {
   item: MenuItem;
   quantity: number;
+  notes?: string;
 }
-
-const MENU: Record<Category, MenuItem[]> = {
-  APPETIZERS: [
-    {
-      id: 1,
-      name: "Wild Sea Scallops",
-      description:
-        "Pan-seared scallops, Périgord truffle, cauliflower silk, and bronze fennel oil.",
-      price: 42,
-      status: "IN STOCK",
-      tag: "Chef's Special",
-      image: "🦪",
-    },
-    {
-      id: 2,
-      name: "Heirloom Burrata",
-      price: 24,
-      status: "IN STOCK",
-      image: "🧀",
-    },
-    {
-      id: 3,
-      name: "Ahi Tuna Tartare",
-      price: 28,
-      status: "SOLD OUT",
-      image: "🐟",
-    },
-    {
-      id: 4,
-      name: "Wagyu Carpaccio",
-      price: 32,
-      status: "IN STOCK",
-      image: "🥩",
-    },
-    {
-      id: 5,
-      name: "Lobster Bisque",
-      price: 19,
-      status: "IN STOCK",
-      image: "🦞",
-    },
-  ],
-  "MAIN COURSE": [
-    {
-      id: 6,
-      name: "Dry Aged Ribeye",
-      price: 88,
-      status: "IN STOCK",
-      image: "🥩",
-    },
-    {
-      id: 7,
-      name: "Sea Bass en Papillote",
-      price: 56,
-      status: "IN STOCK",
-      image: "🐟",
-    },
-    {
-      id: 8,
-      name: "Truffle Risotto",
-      price: 44,
-      status: "IN STOCK",
-      image: "🍚",
-    },
-  ],
-  DRINKS: [
-    {
-      id: 9,
-      name: "Cabernet Sauvignon",
-      price: 185,
-      status: "IN STOCK",
-      tag: "Bottle Service",
-      image: "🍷",
-    },
-    {
-      id: 10,
-      name: "House Sparkling",
-      price: 18,
-      status: "IN STOCK",
-      image: "🥂",
-    },
-  ],
-  DESSERTS: [
-    {
-      id: 11,
-      name: "Valrhona Soufflé",
-      price: 22,
-      status: "IN STOCK",
-      image: "🍫",
-    },
-    {
-      id: 12,
-      name: "Seasonal Sorbet",
-      price: 16,
-      status: "IN STOCK",
-      image: "🍧",
-    },
-  ],
-};
 
 const STATUS_COLORS = {
   "IN STOCK": "bg-green-100 text-green-700",
   "SOLD OUT": "bg-red-500 text-white",
 };
 
-export default function OrderPage() {
-  const params = useParams();
-  const tableId = params.id as string;
+const mapCategory = (backendCat: DishCategory): Category => {
+  if (backendCat === "Appetizer") return "APPETIZERS";
+  if (backendCat === "Main_Course") return "MAIN COURSE";
+  if (backendCat === "Beverage") return "DRINKS";
+  if (backendCat === "Dessert") return "DESSERTS";
+  return "MAIN COURSE";
+};
+
+const getEmojiForCategory = (cat: DishCategory) => {
+  if (cat === "Appetizer") return "🥗";
+  if (cat === "Main_Course") return "🥩";
+  if (cat === "Beverage") return "🍷";
+  if (cat === "Dessert") return "🍰";
+  return "🍽️";
+};
+
+export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const tableId = resolvedParams.id;
+  const router = useRouter();
+
+  const [menuData, setMenuData] = useState<Record<Category, MenuItem[]>>({
+    APPETIZERS: [],
+    "MAIN COURSE": [],
+    DRINKS: [],
+    DESSERTS: []
+  });
+  const [loading, setLoading] = useState(true);
+
   const [category, setCategory] = useState<Category>("APPETIZERS");
-  const [cart, setCart] = useState<CartItem[]>([
-    { item: MENU.APPETIZERS[0], quantity: 1 },
-    { item: MENU.APPETIZERS[1], quantity: 1 },
-  ]);
-  const [notes, setNotes] = useState("");
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [orderNotes, setOrderNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const dishes = await MenuService.getDishes();
+        const grouped: Record<Category, MenuItem[]> = {
+          APPETIZERS: [],
+          "MAIN COURSE": [],
+          DRINKS: [],
+          DESSERTS: []
+        };
+
+        dishes.forEach(dish => {
+          const cat = mapCategory(dish.category);
+          grouped[cat].push({
+            id: dish.dishId,
+            name: dish.name,
+            price: dish.basePrice,
+            status: dish.available ? "IN STOCK" : "SOLD OUT",
+            image: getEmojiForCategory(dish.category),
+            originalDish: dish
+          });
+        });
+
+        setMenuData(grouped);
+        // Set initial category to the first one that has items
+        const firstActiveCat = (Object.keys(grouped) as Category[]).find(c => grouped[c].length > 0);
+        if (firstActiveCat) setCategory(firstActiveCat);
+        
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to load menu", err);
+        setLoading(false);
+      }
+    };
+    fetchMenu();
+  }, []);
 
   const addToCart = (item: MenuItem) => {
     setCart((prev) => {
@@ -166,6 +133,30 @@ export default function OrderPage() {
 
   const subtotal = cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0);
 
+  const handleFireToKitchen = async () => {
+    if (cart.length === 0) return alert("Cart is empty!");
+    
+    setIsSubmitting(true);
+    try {
+      await OrderService.createOrder({
+        tableId: parseInt(tableId),
+        customerId: 1, // Mock customer ID
+        note: orderNotes,
+        items: cart.map(c => ({
+          dishId: c.item.originalDish.dishId,
+          quantity: c.quantity,
+        }))
+      });
+      
+      // Navigate to payment page as requested by user
+      router.push(`/server/tables/${tableId}/payment`);
+    } catch (err) {
+      console.error("Failed to submit order", err);
+      alert("Failed to submit order. Please try again.");
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
@@ -195,7 +186,7 @@ export default function OrderPage() {
           <div className="flex items-center gap-4 text-sm text-irms-text-primary mb-5">
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-irms-text-primary inline-block" />
-              4 Guests
+              Ready to Order
             </span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-irms-text-primary inline-block" />
@@ -203,140 +194,132 @@ export default function OrderPage() {
             </span>
           </div>
 
-          {/* Category tabs */}
-          <div className="flex items-center gap-2 mb-6">
-            {(Object.keys(MENU) as Category[]).map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                  category === cat
-                    ? "bg-irms-green text-white"
-                    : "bg-white border border-irms-border text-irms-text-primary hover:border-irms-green/40"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center h-48 text-irms-text-muted">Loading menu from API...</div>
+          ) : (
+            <>
+              {/* Category tabs */}
+              <div className="flex items-center gap-2 mb-6">
+                {(Object.keys(menuData) as Category[]).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                      category === cat
+                        ? "bg-irms-green text-white"
+                        : "bg-white border border-irms-border text-irms-text-primary hover:border-irms-green/40"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
 
-          {/* Menu grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {MENU[category].map((item) => {
-              const inCart = cart.find((c) => c.item.id === item.id);
-              return (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-xl border border-irms-border overflow-hidden hover:shadow-md transition-shadow flex flex-col"
-                >
-                  {/* Image placeholder */}
-                  <div className="h-32 bg-linear-to-br from-irms-bg-secondary to-irms-border flex items-center justify-center text-5xl shrink-0">
-                    {item.image}
-                  </div>
-
-                  <div className="p-4 flex flex-col flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded ${STATUS_COLORS[item.status]}`}
-                      >
-                        {item.status}
-                      </span>
-                      {item.tag && (
-                        <span className="text-xs text-irms-text-muted">
-                          • {item.tag}
-                        </span>
-                      )}
-                      {item.status === "IN STOCK" && (
-                        <span className="ml-auto text-base font-bold text-irms-text-primary">
-                          ${item.price}
-                        </span>
-                      )}
-                    </div>
-
-                    <h3
-                      className={`font-bold text-irms-text-primary mb-1 ${item.description ? "" : "text-sm"}`}
+              {/* Menu grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                {menuData[category].map((item) => {
+                  const inCart = cart.find((c) => c.item.id === item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-white rounded-xl border border-irms-border overflow-hidden hover:shadow-md transition-shadow flex flex-col"
                     >
-                      {item.name}
-                    </h3>
-                    {item.description && (
-                      <p className="text-xs text-irms-text-muted mb-3 line-clamp-2">
-                        {item.description}
-                      </p>
-                    )}
-                    {!item.description && item.status !== "SOLD OUT" && (
-                      <p className="text-base font-bold text-irms-text-primary mb-2">
-                        ${item.price}
-                      </p>
-                    )}
-
-                    {/* Spacer pushes action to bottom */}
-                    <div className="flex-1" />
-
-                    {item.status === "SOLD OUT" ? (
-                      <div className="py-1 text-xs text-irms-text-muted text-center">
-                        Unavailable
+                      {/* Image placeholder */}
+                      <div className="h-32 bg-linear-to-br from-irms-bg-secondary to-irms-border flex items-center justify-center text-5xl shrink-0">
+                        {item.image}
                       </div>
-                    ) : inCart ? (
-                      <div className="flex items-center justify-between gap-2 mt-1">
-                        <button
-                          onClick={() => decreaseFromCart(item)}
-                          className="w-9 h-9 rounded-lg border border-irms-border text-irms-text-primary flex items-center justify-center hover:bg-irms-bg-secondary transition-colors cursor-pointer text-lg font-bold leading-none"
-                          aria-label="Decrease quantity"
-                        >
-                          −
-                        </button>
-                        <span className="text-sm font-bold text-irms-text-primary min-w-6 text-center">
-                          {inCart.quantity}
-                        </span>
-                        <button
-                          onClick={() => addToCart(item)}
-                          className="w-9 h-9 rounded-lg bg-irms-green text-white flex items-center justify-center hover:bg-irms-green/80 transition-colors cursor-pointer"
-                          aria-label="Increase quantity"
-                        >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+
+                      <div className="p-4 flex flex-col flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span
+                            className={`text-xs font-bold px-2 py-0.5 rounded ${STATUS_COLORS[item.status]}`}
                           >
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                          </svg>
-                        </button>
+                            {item.status}
+                          </span>
+                          {item.tag && (
+                            <span className="text-xs text-irms-text-muted">
+                              • {item.tag}
+                            </span>
+                          )}
+                          {item.status === "IN STOCK" && (
+                            <span className="ml-auto text-base font-bold text-irms-text-primary">
+                              ${item.price}
+                            </span>
+                          )}
+                        </div>
+
+                        <h3
+                          className={`font-bold text-irms-text-primary mb-1 ${item.description ? "" : "text-sm"}`}
+                        >
+                          {item.name}
+                        </h3>
+                        {item.description && (
+                          <p className="text-xs text-irms-text-muted mb-3 line-clamp-2">
+                            {item.description}
+                          </p>
+                        )}
+                        {!item.description && item.status !== "SOLD OUT" && (
+                          <p className="text-base font-bold text-irms-text-primary mb-2">
+                            ${item.price}
+                          </p>
+                        )}
+
+                        <div className="flex-1" />
+
+                        {item.status === "SOLD OUT" ? (
+                          <div className="py-1 text-xs text-irms-text-muted text-center">
+                            Unavailable
+                          </div>
+                        ) : inCart ? (
+                          <div className="flex items-center justify-between gap-2 mt-1">
+                            <button
+                              onClick={() => decreaseFromCart(item)}
+                              className="w-9 h-9 rounded-lg border border-irms-border text-irms-text-primary flex items-center justify-center hover:bg-irms-bg-secondary transition-colors cursor-pointer text-lg font-bold leading-none"
+                            >
+                              −
+                            </button>
+                            <span className="text-sm font-bold text-irms-text-primary min-w-6 text-center">
+                              {inCart.quantity}
+                            </span>
+                            <button
+                              onClick={() => addToCart(item)}
+                              className="w-9 h-9 rounded-lg bg-irms-green text-white flex items-center justify-center hover:bg-irms-green/80 transition-colors cursor-pointer"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => addToCart(item)}
+                            className="w-full py-3 rounded-lg flex items-center justify-center gap-2 bg-irms-orange hover:bg-irms-orange/80 text-white text-xs font-bold tracking-wider transition-colors cursor-pointer mt-1"
+                          >
+                            <ShoppingCart className="w-4 h-4" />
+                            ADD TO CART
+                          </button>
+                        )}
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => addToCart(item)}
-                        className="w-full py-3 rounded-lg flex items-center justify-center gap-2 bg-irms-orange hover:bg-irms-orange/80 text-white text-xs font-bold tracking-wider transition-colors cursor-pointer mt-1"
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        ADD TO CART
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Cart */}
         <div className="w-[400px] shrink-0 bg-white border-l border-irms-border flex flex-col">
-          {/* Cart header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-irms-border">
             <h2 className="text-lg font-bold text-irms-text-primary">
               Current Cart
             </h2>
             <span className="bg-irms-bg-secondary text-irms-text-primary text-xs font-bold px-2 py-1 rounded-full">
-              {cart.length} ITEMS
+              {cart.reduce((s, c) => s + c.quantity, 0)} ITEMS
             </span>
           </div>
 
-          {/* Cart items */}
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
             {cart.map((c) => (
               <div
@@ -371,21 +354,19 @@ export default function OrderPage() {
             ))}
           </div>
 
-          {/* Kitchen notes */}
           <div className="px-6 py-4">
             <p className="text-xs font-bold text-irms-text-primary tracking-widest uppercase mb-2">
               Kitchen Notes
             </p>
             <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
               placeholder="e.g. Allergy: Shellfish, Dressing on the side..."
               rows={3}
               className="w-full bg-[#f9fafb] border border-irms-border rounded-lg p-3 text-sm text-irms-text-primary placeholder-irms-text-muted outline-none resize-none focus:border-irms-green transition-colors"
             />
           </div>
 
-          {/* Subtotal + Fire */}
           <div className="px-6 pb-6 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-irms-text-secondary tracking-widest uppercase">
@@ -395,13 +376,17 @@ export default function OrderPage() {
                 ${subtotal.toFixed(2)}
               </span>
             </div>
-            <Link
-              href={`/server/tables/${tableId}/payment`}
-              className="flex items-center justify-center gap-2 w-full bg-linear-to-r from-irms-green to-irms-green/80 hover:from-irms-green/80 hover:to-irms-green py-3 px-4 rounded-xl transition-colors duration-500 text-sm text-white font-bold"
+            <button
+              onClick={handleFireToKitchen}
+              disabled={isSubmitting || cart.length === 0}
+              className={`flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl transition-colors duration-500 text-sm text-white font-bold cursor-pointer
+                ${isSubmitting || cart.length === 0 
+                  ? "bg-gray-400 cursor-not-allowed" 
+                  : "bg-linear-to-r from-irms-green to-irms-green/80 hover:from-irms-green/80 hover:to-irms-green"}`}
             >
               <Flame className="w-4 h-4" />
-              CONFIRM &amp; FIRE TO KITCHEN
-            </Link>
+              {isSubmitting ? "SENDING..." : "CONFIRM & FIRE TO KITCHEN"}
+            </button>
             <button className="w-full text-sm font-semibold text-irms-text-primary hover:text-irms-text-primary/80 py-2 transition-colors cursor-pointer">
               SAVE AS DRAFT
             </button>
