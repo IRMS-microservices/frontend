@@ -2,12 +2,13 @@
 
 import { Topbar } from "@/components/shared/Topbar";
 import Link from "next/link";
-import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useState, useEffect, use } from "react";
 import { UsersRound } from "lucide-react";
 import TableDiagram from "@/components/app/table/TableDiagram";
 import AssignGuestModal from "@/components/app/table/AssignGuestModal";
 import { CustomerInfoModal } from "@/components/app/table/CustomerInfoModal";
+import { OrderService } from "@/services/order.service";
+import { OrderResponse } from "@/types/api.types";
 
 type TableState = "empty" | "assigned";
 
@@ -83,13 +84,45 @@ const TABLE_ATTRS = [
   },
 ];
 
-export default function TableDetailPage() {
-  const params = useParams();
-  const tableId = params.id as string;
+export default function TableDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const tableId = resolvedParams.id;
+
   const [tableState, setTableState] = useState<TableState>("empty");
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [guest, setGuest] = useState<GuestInfo | null>(null);
+  const [activeOrder, setActiveOrder] = useState<OrderResponse | null>(null);
+
+  useEffect(() => {
+    const checkTableStatus = async () => {
+      try {
+        const orders = await OrderService.getOrders(parseInt(tableId));
+        const currentActiveOrder = orders.find(o => o.serviceStatus === 'Waiting' || o.serviceStatus === 'Eating');
+        
+        if (currentActiveOrder) {
+          setActiveOrder(currentActiveOrder);
+          setTableState("assigned");
+          if (!guest) {
+            setGuest({
+              name: currentActiveOrder.note ? `Note: ${currentActiveOrder.note}` : `Guest #${currentActiveOrder.customerId || "Walk-in"}`,
+              gender: "N/A",
+              phone: "N/A",
+              partySize: 2, 
+              preference: "N/A"
+            });
+          }
+        } else {
+          setActiveOrder(null);
+          setTableState("empty");
+        }
+      } catch (error) {
+        console.error("Failed to check table status:", error);
+      }
+    };
+
+    checkTableStatus();
+  }, [tableId]); // Only rerun if tableId changes
 
   const handleConfirmAssign = (g: GuestInfo) => {
     setGuest(g);
@@ -221,7 +254,13 @@ export default function TableDetailPage() {
                     Create order
                   </Link>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      if (activeOrder) {
+                        try {
+                           await OrderService.updateServiceStatus(activeOrder.orderId, 'Finished');
+                           await OrderService.updatePaymentStatus(activeOrder.orderId, 'Paid');
+                        } catch (e) {}
+                      }
                       setTableState("empty");
                       setGuest(null);
                     }}
@@ -243,7 +282,7 @@ export default function TableDetailPage() {
                       <line x1="20" y1="8" x2="20" y2="14" />
                       <line x1="23" y1="11" x2="17" y2="11" />
                     </svg>
-                    Re-assign guest
+                    Clear Table
                   </button>
                 </div>
               </>
