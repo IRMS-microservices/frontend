@@ -5,7 +5,7 @@ import Link from "next/link";
 import { JSX, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { OrderService } from "@/services/order.service";
-import { OrderResponse } from "@/types/api.types";
+import { OrderResponse } from "@/types/menuOrder.types";
 
 type PaymentMethod = "CREDIT CARD" | "QR CODE" | "CASH" | "DIGITAL WALLET";
 
@@ -46,12 +46,17 @@ const STATUS_ICONS: Record<string, JSX.Element> = {
   ),
 };
 
-export default function PaymentPage({ params }: { params: Promise<{ id: string }> }) {
+export default function PaymentPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const resolvedParams = use(params);
   const tableId = resolvedParams.id;
   const router = useRouter();
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CREDIT CARD");
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>("CREDIT CARD");
   const [activeOrder, setActiveOrder] = useState<OrderResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -59,9 +64,12 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        const orders = await OrderService.getOrders(parseInt(tableId));
+        const response = await OrderService.getOrders(parseInt(tableId));
+        const orders = response.data;
         // Find active order (Waiting or Eating)
-        const currentActiveOrder = orders.find(o => o.serviceStatus === 'Waiting' || o.serviceStatus === 'Eating');
+        const currentActiveOrder = orders?.find(
+          (o) => o.serviceStatus === "Waiting" || o.serviceStatus === "Eating",
+        );
         setActiveOrder(currentActiveOrder || null);
         setLoading(false);
       } catch (err) {
@@ -72,10 +80,13 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     fetchOrder();
   }, [tableId]);
 
-  const subtotal = activeOrder 
-    ? activeOrder.items.reduce((sum, item) => sum + (item.salePrice * item.quantity), 0)
+  const subtotal = activeOrder
+    ? activeOrder.items.reduce(
+        (sum, item) => sum + item.salePrice * item.quantity,
+        0,
+      )
     : 0;
-  
+
   const serviceCharge = subtotal * 0.18;
   const tax = subtotal * 0.08;
   const grandTotal = subtotal + serviceCharge + tax;
@@ -85,9 +96,9 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     setIsProcessing(true);
     try {
       // Gọi API cập nhật trạng thái
-      await OrderService.updatePaymentStatus(activeOrder.orderId, 'Paid');
-      await OrderService.updateServiceStatus(activeOrder.orderId, 'Finished');
-      
+      await OrderService.updatePaymentStatus(activeOrder.orderId, "Paid");
+      await OrderService.updateServiceStatus(activeOrder.orderId, "Finished");
+
       alert("Payment successful! Table is now clear.");
       router.push("/server/tables");
     } catch (err) {
@@ -215,11 +226,16 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center h-48 text-irms-text-muted">Loading order details...</div>
+            <div className="flex justify-center items-center h-48 text-irms-text-muted">
+              Loading order details...
+            </div>
           ) : !activeOrder ? (
             <div className="flex flex-col items-center justify-center h-48 text-irms-text-muted">
               <p className="mb-4">No active order for this table.</p>
-              <Link href={`/server/tables/${tableId}/order`} className="text-irms-green font-bold hover:underline">
+              <Link
+                href={`/server/tables/${tableId}/order`}
+                className="text-irms-green font-bold hover:underline"
+              >
                 Create an order first
               </Link>
             </div>
@@ -230,25 +246,38 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   Order Details (ID: #{activeOrder.orderId})
                 </h3>
                 <span className="text-xs font-bold text-irms-text-muted tracking-widest">
-                  {activeOrder.items.reduce((s, i) => s + i.quantity, 0)} ITEMS TOTAL
+                  {activeOrder.items.reduce((s, i) => s + i.quantity, 0)} ITEMS
+                  TOTAL
                 </span>
               </div>
 
               <div className="space-y-4">
                 {activeOrder.items.map((item, idx) => {
-                  const itemStatus = activeOrder.serviceStatus === 'Waiting' ? 'WAITING' : 'SERVED';
+                  const itemStatus =
+                    activeOrder.serviceStatus === "Waiting"
+                      ? "WAITING"
+                      : "SERVED";
                   return (
-                    <div key={item.itemId} className="flex items-center gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                    <div
+                      key={item.itemId}
+                      className="flex items-center gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0"
+                    >
                       <div className="w-8 h-8 rounded-lg bg-irms-bg-secondary flex items-center justify-center text-sm font-bold text-irms-text-primary shrink-0">
                         {idx + 1}
                       </div>
                       <div className="flex-1">
                         <p className="font-semibold text-irms-text-primary text-sm flex items-center gap-2">
-                          {item.quantity > 1 && <span className="bg-irms-green text-white px-1.5 py-0.5 rounded text-xs">{item.quantity}x</span>}
+                          {item.quantity > 1 && (
+                            <span className="bg-irms-green text-white px-1.5 py-0.5 rounded text-xs">
+                              {item.quantity}x
+                            </span>
+                          )}
                           {item.dishName}
                         </p>
                         {item.notes && (
-                          <p className="text-xs text-irms-text-muted italic mt-1">Note: {item.notes}</p>
+                          <p className="text-xs text-irms-text-muted italic mt-1">
+                            Note: {item.notes}
+                          </p>
                         )}
                       </div>
                       <div
@@ -257,8 +286,14 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                         {STATUS_ICONS[itemStatus]}
                         {itemStatus}
                       </div>
-                      <span className="text-sm font-bold text-irms-text-primary w-20 text-right">
-                        ${(item.salePrice * item.quantity).toFixed(2)}
+                      <span className="text-sm font-bold text-irms-text-primary w-32 text-right">
+                        {(item.salePrice * item.quantity).toLocaleString(
+                          "vi-VN",
+                          {
+                            style: "currency",
+                            currency: "VND",
+                          },
+                        )}
                       </span>
                     </div>
                   );
@@ -272,7 +307,10 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
         <div className="w-[350px] shrink-0 bg-white border-l border-irms-border flex flex-col p-6 overflow-y-auto">
           {/* Action buttons */}
           <div className="flex gap-3 mb-6">
-            <button className="flex items-center gap-2 px-4 py-2 border border-irms-border rounded-lg text-sm font-semibold text-irms-text-primary hover:bg-irms-bg-secondary transition-colors cursor-pointer disabled:opacity-50" disabled={!activeOrder}>
+            <button
+              className="flex items-center gap-2 px-4 py-2 border border-irms-border rounded-lg text-sm font-semibold text-irms-text-primary hover:bg-irms-bg-secondary transition-colors cursor-pointer disabled:opacity-50"
+              disabled={!activeOrder}
+            >
               <svg
                 width="16"
                 height="16"
@@ -291,9 +329,18 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             </button>
             <Link
               href={`/server/tables/${tableId}/order`}
-              className={`flex-1 flex items-center justify-center gap-2 bg-irms-green hover:bg-irms-green-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm ${!activeOrder ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`flex-1 flex items-center justify-center gap-2 bg-irms-green hover:bg-irms-green-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm ${!activeOrder ? "opacity-50 pointer-events-none" : ""}`}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
@@ -308,23 +355,41 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           <div className="space-y-3 mb-5">
             <div className="flex justify-between text-sm text-irms-text-primary">
               <span>Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span>
+                {subtotal.toLocaleString("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
+                })}
+              </span>
             </div>
             <div className="flex justify-between text-sm text-irms-text-primary">
               <span>Service Charge (18%)</span>
-              <span>${serviceCharge.toFixed(2)}</span>
+              <span>
+                {serviceCharge.toLocaleString("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
+                })}
+              </span>
             </div>
             <div className="flex justify-between text-sm text-irms-text-primary">
               <span>Tax (8%)</span>
-              <span>${tax.toFixed(2)}</span>
+              <span>
+                {tax.toLocaleString("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
+                })}
+              </span>
             </div>
           </div>
           <div className="flex justify-between items-center mb-6 pt-4 border-t border-irms-border">
             <span className="text-base font-bold text-irms-text-primary">
               Grand Total
             </span>
-            <span className="text-3xl font-bold text-irms-green">
-              ${grandTotal.toFixed(2)}
+            <span className="text-2xl font-bold text-irms-green">
+              {grandTotal.toLocaleString("vi-VN", {
+                style: "currency",
+                currency: "VND",
+              })}
             </span>
           </div>
 
@@ -342,7 +407,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   paymentMethod === m.label
                     ? "bg-white border-irms-green text-irms-green"
                     : "bg-irms-bg-secondary border-irms-border text-irms-text-muted hover:border-irms-green/40"
-                } ${!activeOrder ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${!activeOrder ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 {m.icon}
                 {m.label}
@@ -355,9 +420,11 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             onClick={handlePayment}
             disabled={!activeOrder || isProcessing}
             className={`flex items-center justify-center gap-2 w-full duration-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors text-sm
-              ${(!activeOrder || isProcessing) 
-                ? "bg-gray-400 cursor-not-allowed" 
-                : "bg-linear-to-r from-irms-green to-irms-green-light hover:from-irms-green-light hover:to-irms-green cursor-pointer"}`}
+              ${
+                !activeOrder || isProcessing
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-linear-to-r from-irms-green to-irms-green-light hover:from-irms-green-light hover:to-irms-green cursor-pointer"
+              }`}
           >
             <svg
               width="18"
@@ -373,7 +440,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             </svg>
             {isProcessing ? "PROCESSING..." : "Complete Payment & Clear Table"}
           </button>
-          <button 
+          <button
             disabled={!activeOrder}
             className="w-full mt-3 py-3 rounded-xl bg-irms-bg-secondary hover:bg-irms-bg-secondary-dark text-irms-text-primary font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >

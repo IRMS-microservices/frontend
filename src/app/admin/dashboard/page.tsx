@@ -1,29 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AuthService } from "@/services/auth.service";
+import { UserService, UserResponse } from "@/services/user.service";
 import { IrmsLogo } from "@/components/shared/IrmsLogo";
 
-type User = {
-  id: string; // username
-  name: string; // fullName
-  phone: string;
-  role: string;
-};
-
-const initialUsers: User[] = [
-  { id: "admin_master", name: "Charlie Davis", phone: "+1 555 123 4567", role: "ADMIN" },
-  { id: "staff_001", name: "Alice Johnson", phone: "+1 234 567 8900", role: "SERVER" },
-  { id: "kitchen_02", name: "Bob Smith", phone: "+1 987 654 3210", role: "KITCHEN" },
-];
-
 export default function AdminDashboardPage() {
-  const [users, setUsers] = useState<User[]>(initialUsers);
-  
+  const [users, setUsers] = useState<UserResponse[]>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"ADD" | "EDIT">("ADD");
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+
   // Form States
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
@@ -31,10 +19,29 @@ export default function AdminDashboardPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [role, setRole] = useState("SERVER");
-  
+
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    setIsFetching(true);
+    try {
+      const response = await UserService.getAllUsers();
+      if (response.success && response.data) {
+        setUsers(response.data);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch users:", err);
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const openAddModal = () => {
     setModalMode("ADD");
@@ -50,12 +57,12 @@ export default function AdminDashboardPage() {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (user: User) => {
+  const openEditModal = (user: UserResponse) => {
     setModalMode("EDIT");
     setEditingUserId(user.id);
-    setUsername(user.id);
-    setFullName(user.name);
-    setPhoneNumber(user.phone);
+    setUsername(user.username);
+    setFullName(user.full_name);
+    setPhoneNumber(user.phone_number);
     setRole(user.role);
     setPassword("");
     setConfirmPassword("");
@@ -74,7 +81,7 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
-    
+
     if (modalMode === "ADD" && password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -83,32 +90,61 @@ export default function AdminDashboardPage() {
     setIsLoading(true);
     try {
       if (modalMode === "ADD") {
-        // Real API call for adding (Register)
-        const response = await AuthService.register({ username, password, fullName, phoneNumber });
+        const response = await AuthService.register({
+          username,
+          password,
+          fullName,
+          phoneNumber,
+          role,
+        });
         if (response.success) {
           setSuccessMsg("User successfully registered!");
-          setUsers([...users, { id: username, name: fullName, phone: phoneNumber, role }]);
+          await fetchUsers(); // Refresh the list
           setTimeout(closeAndResetModal, 1500);
         } else {
           setError(response.message || "Registration failed");
         }
       } else {
-        // MOCK Edit API call
-        setSuccessMsg("User successfully updated! (Mock)");
-        setUsers(users.map(u => u.id === editingUserId ? { id: username, name: fullName, phone: phoneNumber, role } : u));
-        setTimeout(closeAndResetModal, 1500);
+        if (editingUserId) {
+          const response = await UserService.updateUser(editingUserId, {
+            full_name: fullName,
+            phone_number: phoneNumber,
+            role: role,
+            ...(password ? { password } : {}),
+          });
+          if (response.success) {
+            setSuccessMsg("User successfully updated!");
+            await fetchUsers(); // Refresh the list
+            setTimeout(closeAndResetModal, 1500);
+          } else {
+            setError(response.message || "Update failed");
+          }
+        }
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || "An error occurred. Check your Admin access.");
+      setError(
+        err?.response?.data?.message ||
+          "An error occurred. Check your Admin access.",
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm(`Are you sure you want to delete user ${id}?`)) {
-      // Mock delete
-      setUsers(users.filter(u => u.id !== id));
+  const handleDelete = async (id: number, username: string) => {
+    if (window.confirm(`Are you sure you want to delete user ${username}?`)) {
+      try {
+        const response = await UserService.deleteUser(id);
+        if (response.success) {
+          await fetchUsers(); // Refresh list after deletion
+        } else {
+          alert(response.message || "Delete failed");
+        }
+      } catch (err: any) {
+        alert(
+          err?.response?.data?.message || "An error occurred during deletion.",
+        );
+      }
     }
   };
 
@@ -117,11 +153,20 @@ export default function AdminDashboardPage() {
       {/* Top Navbar */}
       <header className="bg-irms-green text-white p-4 shadow-md flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <IrmsLogo className="text-white w-8 h-8" />
+          <IrmsLogo className="text-white w-8 h-8" includeText={false} />
           <h1 className="text-xl font-bold tracking-wide">Admin Portal</h1>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm font-semibold">Welcome, Administrator</span>
+          <button
+            onClick={() => {
+              AuthService.logout();
+              window.location.href = "/login";
+            }}
+            className="bg-white text-irms-green px-3 py-1.5 rounded-lg font-semibold hover:bg-irms-green-light hover:text-white transition-colors"
+          >
+            Logout
+          </button>
         </div>
       </header>
 
@@ -130,14 +175,27 @@ export default function AdminDashboardPage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-irms-text-primary">User Management</h2>
-              <p className="text-sm text-irms-text-secondary mt-1">Manage staff access and roles across the system.</p>
+              <h2 className="text-2xl font-bold text-irms-text-primary">
+                User Management
+              </h2>
+              <p className="text-sm text-irms-text-secondary mt-1">
+                Manage staff access and roles across the system.
+              </p>
             </div>
-            <button 
+            <button
               onClick={openAddModal}
               className="bg-irms-green hover:bg-irms-green-light transition-colors text-white px-5 py-2.5 rounded-lg font-semibold flex items-center gap-2 shadow-sm"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                 <circle cx="8.5" cy="7" r="4" />
                 <line x1="20" y1="8" x2="20" y2="14" />
@@ -160,45 +218,72 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-irms-border">
-                {users.map(user => (
-                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4">
-                      <div className="font-medium text-irms-text-primary">{user.name}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm text-irms-text-secondary">{user.id}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm text-irms-text-secondary">{user.phone}</div>
-                    </td>
-                    <td className="p-4">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${
-                        user.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
-                        user.role === 'KITCHEN' ? 'bg-orange-100 text-orange-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <button 
-                        onClick={() => openEditModal(user)}
-                        className="text-irms-green hover:text-irms-green-dark transition-colors mr-3 text-sm font-semibold"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(user.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors text-sm font-semibold"
-                      >
-                        Remove
-                      </button>
+                {isFetching ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="p-8 text-center text-irms-text-secondary"
+                    >
+                      Loading staff members...
                     </td>
                   </tr>
-                ))}
-                {users.length === 0 && (
+                ) : (
+                  users.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="p-4">
+                        <div className="font-medium text-irms-text-primary">
+                          {user.full_name}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm text-irms-text-secondary">
+                          {user.username}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm text-irms-text-secondary">
+                          {user.phone_number}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${
+                            user.role === "ADMIN"
+                              ? "bg-purple-100 text-purple-700"
+                              : user.role === "KITCHEN"
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() => openEditModal(user)}
+                          className="text-irms-green hover:text-irms-green-dark transition-colors mr-3 text-sm font-semibold"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(user.id, user.username)}
+                          className="text-red-500 hover:text-red-700 transition-colors text-sm font-semibold"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+                {!isFetching && users.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-irms-text-secondary">
+                    <td
+                      colSpan={5}
+                      className="p-8 text-center text-irms-text-secondary"
+                    >
                       No staff members found.
                     </td>
                   </tr>
@@ -215,21 +300,41 @@ export default function AdminDashboardPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-irms-border flex justify-between items-center bg-gray-50">
               <h3 className="text-xl font-bold text-irms-text-primary">
-                {modalMode === "ADD" ? "Register New Staff" : "Edit Staff Member"}
+                {modalMode === "ADD"
+                  ? "Register New Staff"
+                  : "Edit Staff Member"}
               </h3>
-              <button onClick={closeAndResetModal} className="text-gray-400 hover:text-gray-700 transition-colors">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <button
+                onClick={closeAndResetModal}
+                className="text-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto">
-              <form id="register-form" onSubmit={handleRegister} className="flex flex-col gap-4">
+              <form
+                id="register-form"
+                onSubmit={handleRegister}
+                className="flex flex-col gap-4"
+              >
                 {/* Full Name */}
                 <div>
-                  <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">Full Name</label>
+                  <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">
+                    Full Name
+                  </label>
                   <input
                     type="text"
                     required
@@ -242,7 +347,9 @@ export default function AdminDashboardPage() {
 
                 {/* Username */}
                 <div>
-                  <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">Username (Staff ID)</label>
+                  <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">
+                    Username (Staff ID)
+                  </label>
                   <input
                     type="text"
                     required
@@ -257,7 +364,9 @@ export default function AdminDashboardPage() {
                 <div className="grid grid-cols-2 gap-4">
                   {/* Phone */}
                   <div>
-                    <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">Phone Number</label>
+                    <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">
+                      Phone Number
+                    </label>
                     <input
                       type="tel"
                       required
@@ -267,11 +376,13 @@ export default function AdminDashboardPage() {
                       className="w-full bg-[#f9fafb] border border-irms-border rounded-lg px-3 py-2.5 text-sm text-irms-text-primary focus:border-irms-green focus:outline-none transition-colors"
                     />
                   </div>
-                  
+
                   {/* Role */}
                   <div>
-                    <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">Role</label>
-                    <select 
+                    <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">
+                      Role
+                    </label>
+                    <select
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
                       className="w-full bg-[#f9fafb] border border-irms-border rounded-lg px-3 py-2.5 text-sm text-irms-text-primary focus:border-irms-green focus:outline-none transition-colors"
@@ -300,7 +411,9 @@ export default function AdminDashboardPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">Confirm Password</label>
+                      <label className="text-xs font-semibold text-irms-text-primary tracking-widest uppercase mb-1.5 block">
+                        Confirm Password
+                      </label>
                       <input
                         type="password"
                         required={modalMode === "ADD" && password.length > 0}
@@ -313,13 +426,21 @@ export default function AdminDashboardPage() {
                   </div>
                 )}
 
-                {error && <div className="text-red-500 text-sm font-semibold mt-2">{error}</div>}
-                {successMsg && <div className="text-green-600 text-sm font-semibold mt-2">{successMsg}</div>}
+                {error && (
+                  <div className="text-red-500 text-sm font-semibold mt-2">
+                    {error}
+                  </div>
+                )}
+                {successMsg && (
+                  <div className="text-green-600 text-sm font-semibold mt-2">
+                    {successMsg}
+                  </div>
+                )}
               </form>
             </div>
-            
+
             <div className="p-6 border-t border-irms-border bg-gray-50 flex justify-end gap-3">
-              <button 
+              <button
                 type="button"
                 onClick={closeAndResetModal}
                 className="px-5 py-2.5 text-sm font-semibold text-irms-text-secondary hover:text-irms-text-primary transition-colors"
@@ -334,7 +455,11 @@ export default function AdminDashboardPage() {
                   isLoading ? "opacity-70 cursor-not-allowed" : ""
                 }`}
               >
-                {isLoading ? "Saving..." : modalMode === "ADD" ? "Register Staff" : "Save Changes"}
+                {isLoading
+                  ? "Saving..."
+                  : modalMode === "ADD"
+                    ? "Register Staff"
+                    : "Save Changes"}
               </button>
             </div>
           </div>

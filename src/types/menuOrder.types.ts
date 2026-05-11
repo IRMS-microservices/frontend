@@ -8,6 +8,7 @@ export interface DishResponse {
   category: DishCategory;
   basePrice: number;
   available: boolean;
+  imageUrl: string;
 }
 
 export interface OrderItemResponse {

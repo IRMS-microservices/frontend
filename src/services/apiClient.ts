@@ -3,7 +3,7 @@ import axios from 'axios';
 // Khởi tạo một Axios instance với cấu hình mặc định
 const apiClient = axios.create({
   // Tạm thời dùng Next.js Route Handlers (Mock API) thay vì BE Java
-  baseURL: '/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -13,10 +13,12 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    // const token = localStorage.getItem('token');
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error)

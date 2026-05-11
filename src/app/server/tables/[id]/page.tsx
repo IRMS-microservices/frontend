@@ -8,7 +8,10 @@ import TableDiagram from "@/components/app/table/TableDiagram";
 import AssignGuestModal from "@/components/app/table/AssignGuestModal";
 import { CustomerInfoModal } from "@/components/app/table/CustomerInfoModal";
 import { OrderService } from "@/services/order.service";
-import { OrderResponse } from "@/types/api.types";
+import { OrderResponse } from "@/types/menuOrder.types";
+import { TableService } from "@/services/table.service";
+import { CustomerService } from "@/services/customer.service";
+import { TableResponse, TableStatus } from "@/types/table.types";
 
 type TableState = "empty" | "assigned";
 
@@ -84,7 +87,11 @@ const TABLE_ATTRS = [
   },
 ];
 
-export default function TableDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function TableDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const resolvedParams = use(params);
   const tableId = resolvedParams.id;
 
@@ -93,24 +100,70 @@ export default function TableDetailPage({ params }: { params: Promise<{ id: stri
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [guest, setGuest] = useState<GuestInfo | null>(null);
   const [activeOrder, setActiveOrder] = useState<OrderResponse | null>(null);
+  const [tableInfo, setTableInfo] = useState<TableResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const checkTableStatus = async () => {
+      setIsLoading(true);
       try {
-        const orders = await OrderService.getOrders(parseInt(tableId));
-        const currentActiveOrder = orders.find(o => o.serviceStatus === 'Waiting' || o.serviceStatus === 'Eating');
-        
-        if (currentActiveOrder) {
-          setActiveOrder(currentActiveOrder);
+        const [tableRes, ordersRes] = await Promise.all([
+          TableService.getTable(parseInt(tableId)),
+          OrderService.getOrders(parseInt(tableId)),
+        ]);
+
+        const tableData = tableRes.data;
+        setTableInfo(tableData);
+
+        const orders = ordersRes.data;
+        const currentActiveOrder = orders?.find(
+          (o) => o.serviceStatus === "Waiting" || o.serviceStatus === "Eating",
+        );
+
+        let customerData = null;
+        if (currentActiveOrder?.customerId) {
+          try {
+            const customerRes = await CustomerService.getCustomerById(
+              currentActiveOrder.customerId,
+            );
+            customerData = customerRes.data;
+          } catch (e) {
+            console.error("Failed to fetch customer", e);
+          }
+        }
+
+        if (tableData?.status !== TableStatus.AVAILABLE || currentActiveOrder) {
+          if (currentActiveOrder) setActiveOrder(currentActiveOrder);
           setTableState("assigned");
+
+          let localGuest = null;
+          try {
+            const saved = localStorage.getItem(`table_guest_${tableId}`);
+            if (saved) localGuest = JSON.parse(saved);
+          } catch (e) {}
+
           if (!guest) {
-            setGuest({
-              name: currentActiveOrder.note ? `Note: ${currentActiveOrder.note}` : `Guest #${currentActiveOrder.customerId || "Walk-in"}`,
-              gender: "N/A",
-              phone: "N/A",
-              partySize: 2, 
-              preference: "N/A"
-            });
+            if (localGuest && !currentActiveOrder) {
+              setGuest(localGuest);
+            } else {
+              const customerDisplay = customerData
+                ? customerData.gender === "Male"
+                  ? `Mr. ${customerData.name}`
+                  : `Ms. ${customerData.name}`
+                : null;
+
+              setGuest({
+                name:
+                  customerDisplay ||
+                  (currentActiveOrder?.note
+                    ? `Note: ${currentActiveOrder.note}`
+                    : `Guest #${currentActiveOrder?.customerId || "Walk-in"}`),
+                gender: customerData?.gender || "N/A",
+                phone: customerData?.phone || "N/A",
+                partySize: tableData?.currentGuestsNumber || 0,
+                preference: "N/A",
+              });
+            }
           }
         } else {
           setActiveOrder(null);
@@ -118,16 +171,56 @@ export default function TableDetailPage({ params }: { params: Promise<{ id: stri
         }
       } catch (error) {
         console.error("Failed to check table status:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     checkTableStatus();
   }, [tableId]); // Only rerun if tableId changes
 
-  const handleConfirmAssign = (g: GuestInfo) => {
-    setGuest(g);
-    setTableState("assigned");
-    setShowAssignModal(false);
+  const handleConfirmAssign = async (g: GuestInfo) => {
+    try {
+      // 1. Create customer first to get real customerId
+      let customerId: number | undefined;
+      try {
+        const customerRes = await CustomerService.createCustomer({
+          name: g.name,
+          gender: g.gender,
+          phone: g.phone,
+        });
+        customerId = customerRes.data.customerId;
+        
+        // Save to localStorage immediately
+        localStorage.setItem(
+          `table_guest_${tableId}`,
+          JSON.stringify({
+            ...g,
+            customerId: customerId,
+          }),
+        );
+      } catch (err) {
+        console.error("Failed to create customer:", err);
+        localStorage.setItem(`table_guest_${tableId}`, JSON.stringify(g));
+      }
+
+      // 2. Assign table with customer info
+      await TableService.assignTable(parseInt(tableId), {
+        guestsNumber: g.partySize,
+        name: g.name,
+        phone: g.phone,
+        gender: g.gender,
+        customerId: customerId,
+      });
+
+      setGuest(g);
+      setTableState("assigned");
+      setShowAssignModal(false);
+      window.location.reload();
+    } catch (e) {
+      console.error("Failed to assign table:", e);
+      alert("Failed to assign table. Please try again.");
+    }
   };
 
   return (
@@ -161,7 +254,7 @@ export default function TableDetailPage({ params }: { params: Promise<{ id: stri
               className={`w-2 h-2 rounded-full ${tableState === "empty" ? "bg-green-400" : "bg-irms-orange"}`}
             />
             {tableState === "empty" ? (
-              "Status: Currently Available • Capacity: 4 Guests"
+              `Status: Currently Available • Capacity: ${tableInfo?.capacity ?? 4} Guests`
             ) : (
               <>
                 <span>Status: Assigned to</span>
@@ -171,18 +264,28 @@ export default function TableDetailPage({ params }: { params: Promise<{ id: stri
                 >
                   {guest?.name}
                 </button>
-                <span>• Capacity: 4 Guests</span>
+                <span>• Capacity: {tableInfo?.capacity ?? 4} Guests</span>
               </>
             )}
           </p>
 
           {/* State card */}
-          <div className="bg-white rounded-2xl border border-irms-border flex flex-col items-center justify-center py-16 px-8 text-center">
-            {tableState === "empty" ? (
+          <div className="bg-white rounded-2xl border border-irms-border flex flex-col items-center justify-center py-16 px-8 text-center min-h-[400px]">
+            {isLoading ? (
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 border-4 border-irms-green/20 border-t-irms-green rounded-full animate-spin" />
+                <p className="text-irms-text-muted font-medium">
+                  Checking table status...
+                </p>
+              </div>
+            ) : tableState === "empty" ? (
               <>
                 {/* Table diagram – empty */}
                 <div className="w-28 h-28 mb-5">
-                  <TableDiagram capacity={4} guests={0} />
+                  <TableDiagram
+                    capacity={(tableInfo?.capacity as 2 | 4 | 6 | 8) ?? 4}
+                    guests={0}
+                  />
                 </div>
                 <h3 className="text-2xl font-bold text-irms-text-primary mb-2">
                   Table is Empty
@@ -217,7 +320,10 @@ export default function TableDetailPage({ params }: { params: Promise<{ id: stri
               <>
                 {/* Table diagram – assigned */}
                 <div className="w-48 h-48 mb-5">
-                  <TableDiagram capacity={4} guests={guest?.partySize ?? 0} />
+                  <TableDiagram
+                    capacity={(tableInfo?.capacity as 2 | 4 | 6 | 8) ?? 4}
+                    guests={guest?.partySize ?? 0}
+                  />
                 </div>
                 <h3 className="text-xl font-bold text-irms-text-primary mb-8">
                   <span className="text-irms-green">Table {tableId}</span> has
@@ -257,12 +363,17 @@ export default function TableDetailPage({ params }: { params: Promise<{ id: stri
                     onClick={async () => {
                       if (activeOrder) {
                         try {
-                           await OrderService.updateServiceStatus(activeOrder.orderId, 'Finished');
-                           await OrderService.updatePaymentStatus(activeOrder.orderId, 'Paid');
+                          await TableService.updateTableStatus(
+                            parseInt(tableId),
+                            TableStatus.AVAILABLE,
+                          );
                         } catch (e) {}
                       }
+                      localStorage.removeItem(`table_guest_${tableId}`);
+                      localStorage.removeItem(`table_cart_${tableId}`);
                       setTableState("empty");
                       setGuest(null);
+                      window.location.reload();
                     }}
                     className="flex items-center justify-center gap-2 w-full bg-linear-to-r from-gray-300 to-gray-100 cursor-pointer duration-500
                               hover:bg-linear-to-r hover:from-gray-100 hover:to-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-xl transition-colors text-sm"
@@ -322,28 +433,6 @@ export default function TableDetailPage({ params }: { params: Promise<{ id: stri
                 &quot;Recently polished cherry wood. Ensure center candle is lit
                 upon seating.&quot;
               </p>
-            </div>
-          )}
-
-          {tableState === "assigned" && (
-            <div className="bg-irms-bg-secondary rounded-xl border border-irms-border p-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-irms-green tracking-widest uppercase">
-                  Upcoming
-                </span>
-                <span className="text-xs bg-irms-green text-white px-2 py-0.5 rounded-full">
-                  08:30
-                </span>
-              </div>
-              <p className="text-sm font-semibold text-irms-text-primary">
-                Thompson Party
-              </p>
-              <p className="text-xs text-irms-text-muted mb-2">
-                4 Guests • Anniversary
-              </p>
-              <button className="text-xs font-semibold text-irms-green hover:underline cursor-pointer">
-                View Reservation Details +
-              </button>
             </div>
           )}
         </div>

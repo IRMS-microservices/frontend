@@ -10,7 +10,6 @@ type Station = "ADMIN" | "SERVER" | "KITCHEN";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [station, setStation] = useState<Station>("SERVER");
   const [showPassword, setShowPassword] = useState(false);
   const [trustTerminal, setTrustTerminal] = useState(false);
 
@@ -28,12 +27,12 @@ export default function LoginPage() {
         if (response.data && response.data.token) {
           localStorage.setItem("token", response.data.token);
         }
-        // Redirect based on station or to default
-        if (station === "ADMIN") {
-          router.push("/admin/dashboard"); // Adjust as needed
-        } else if (station === "KITCHEN") {
-          router.push("/kitchen/orders"); // Adjust as needed
-        } else {
+        // Redirect based on role
+        if (response.data?.role === "ADMIN") {
+          router.push("/admin/dashboard");
+        } else if (response.data?.role === "KITCHEN_STAFF") {
+          router.push("/kitchen/expeditor");
+        } else if (response.data?.role === "SERVER") {
           router.push("/server/tables");
         }
       } else {
@@ -91,75 +90,6 @@ export default function LoginPage() {
             <p className="text-irms-text-secondary text-sm">
               Access your restaurant dashboard
             </p>
-          </div>
-
-          {/* Station selector */}
-          <div className="mb-5">
-            <label className="text-xs font-semibold text-irms-text-secondary tracking-widest uppercase mb-2 block">
-              Select Your Station
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(["ADMIN", "SERVER", "KITCHEN"] as Station[]).map((s) => (
-                <button
-                  key={s}
-                  id={`station-${s.toLowerCase()}`}
-                  onClick={() => setStation(s)}
-                  className={`flex flex-col items-center gap-1 py-3 px-2 rounded-lg border-2 text-xs font-semibold tracking-wider transition-all duration-200 cursor-pointer ${
-                    station === s
-                      ? "bg-irms-green border-irms-green text-white"
-                      : "bg-white border-irms-border text-irms-text-primary hover:border-irms-green/40"
-                  }`}
-                >
-                  {s === "ADMIN" && (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  )}
-                  {s === "SERVER" && (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="2" y="3" width="20" height="14" rx="2" />
-                      <path d="M8 21h8M12 17v4" />
-                    </svg>
-                  )}
-                  {s === "KITCHEN" && (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 2a3 3 0 0 0-3 3v7h6V5a3 3 0 0 0-3-3z" />
-                      <path d="M9 12v7a3 3 0 0 0 6 0v-7" />
-                      <path d="M5 10a7 7 0 0 0 4 6.32V22h6v-5.68A7 7 0 0 0 19 10" />
-                    </svg>
-                  )}
-                  {s}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Staff ID */}

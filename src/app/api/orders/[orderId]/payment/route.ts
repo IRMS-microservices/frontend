@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { mockOrdersDb } from '../../../mockData';
-import { PaymentStatus } from '@/types/api.types';
+import { PaymentStatus } from '@/types/menuOrder.types';
 
 export async function PATCH(
   request: Request,

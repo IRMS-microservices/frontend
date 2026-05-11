@@ -2,12 +2,13 @@
 
 import { Topbar } from "@/components/shared/Topbar";
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect, use } from "react";
 import { ShoppingCart, Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { MenuService } from "@/services/menu.service";
 import { OrderService } from "@/services/order.service";
-import { DishCategory, DishResponse } from "@/types/api.types";
+import { DishCategory, DishResponse } from "@/types/menuOrder.types";
 
 type Category = "APPETIZERS" | "MAIN COURSE" | "DRINKS" | "DESSERTS";
 
@@ -49,7 +50,11 @@ const getEmojiForCategory = (cat: DishCategory) => {
   return "🍽️";
 };
 
-export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default function OrderPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const resolvedParams = use(params);
   const tableId = resolvedParams.id;
   const router = useRouter();
@@ -58,7 +63,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     APPETIZERS: [],
     "MAIN COURSE": [],
     DRINKS: [],
-    DESSERTS: []
+    DESSERTS: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -66,35 +71,72 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orderNotes, setOrderNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customerId, setCustomerId] = useState<number | null>(null);
+
+  // Load from localStorage
+  useEffect(() => {
+    // Load Customer ID
+    const savedGuest = localStorage.getItem(`table_guest_${tableId}`);
+    if (savedGuest) {
+      try {
+        const guestData = JSON.parse(savedGuest);
+        if (guestData.customerId) {
+          setCustomerId(guestData.customerId);
+        }
+      } catch (e) {
+        console.error("Failed to parse guest data", e);
+      }
+    }
+
+    // Load Cart
+    const savedCart = localStorage.getItem(`table_cart_${tableId}`);
+    if (savedCart) {
+      try {
+        setCart(JSON.parse(savedCart));
+      } catch (e) {
+        console.error("Failed to parse cart data", e);
+      }
+    }
+  }, [tableId]);
+
+  // Persist Cart
+  useEffect(() => {
+    if (!loading) {
+      localStorage.setItem(`table_cart_${tableId}`, JSON.stringify(cart));
+    }
+  }, [cart, tableId, loading]);
 
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const dishes = await MenuService.getDishes();
+        const dishesResponse = await MenuService.getDishes();
+        const dishes = dishesResponse.data;
         const grouped: Record<Category, MenuItem[]> = {
           APPETIZERS: [],
           "MAIN COURSE": [],
           DRINKS: [],
-          DESSERTS: []
+          DESSERTS: [],
         };
 
-        dishes.forEach(dish => {
+        dishes.forEach((dish) => {
           const cat = mapCategory(dish.category);
           grouped[cat].push({
             id: dish.dishId,
             name: dish.name,
             price: dish.basePrice,
             status: dish.available ? "IN STOCK" : "SOLD OUT",
-            image: getEmojiForCategory(dish.category),
-            originalDish: dish
+            image: dish.imageUrl || getEmojiForCategory(dish.category),
+            originalDish: dish,
           });
         });
 
         setMenuData(grouped);
         // Set initial category to the first one that has items
-        const firstActiveCat = (Object.keys(grouped) as Category[]).find(c => grouped[c].length > 0);
+        const firstActiveCat = (Object.keys(grouped) as Category[]).find(
+          (c) => grouped[c].length > 0,
+        );
         if (firstActiveCat) setCategory(firstActiveCat);
-        
+
         setLoading(false);
       } catch (err) {
         console.error("Failed to load menu", err);
@@ -135,20 +177,22 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   const handleFireToKitchen = async () => {
     if (cart.length === 0) return alert("Cart is empty!");
-    
+
     setIsSubmitting(true);
     try {
       await OrderService.createOrder({
         tableId: parseInt(tableId),
-        customerId: 1, // Mock customer ID
+        customerId: customerId || 1,
         note: orderNotes,
-        items: cart.map(c => ({
+        items: cart.map((c) => ({
           dishId: c.item.originalDish.dishId,
           quantity: c.quantity,
-        }))
+        })),
       });
-      
-      // Navigate to payment page as requested by user
+
+      localStorage.removeItem(`table_cart_${tableId}`);
+      setCart([]);
+
       router.push(`/server/tables/${tableId}/payment`);
     } catch (err) {
       console.error("Failed to submit order", err);
@@ -188,14 +232,12 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               <span className="w-1.5 h-1.5 rounded-full bg-irms-text-primary inline-block" />
               Ready to Order
             </span>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-irms-text-primary inline-block" />
-              Server: Julian
-            </span>
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center h-48 text-irms-text-muted">Loading menu from API...</div>
+            <div className="flex justify-center items-center h-48 text-irms-text-muted">
+              Loading menu from API...
+            </div>
           ) : (
             <>
               {/* Category tabs */}
@@ -226,7 +268,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                     >
                       {/* Image placeholder */}
                       <div className="h-32 bg-linear-to-br from-irms-bg-secondary to-irms-border flex items-center justify-center text-5xl shrink-0">
-                        {item.image}
+                        {item.image ? (
+                          <Image
+                            src={item.image}
+                            alt={item.name}
+                            width={500}
+                            height={500}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          getEmojiForCategory(item.originalDish.category)
+                        )}
                       </div>
 
                       <div className="p-4 flex flex-col flex-1">
@@ -243,7 +295,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                           )}
                           {item.status === "IN STOCK" && (
                             <span className="ml-auto text-base font-bold text-irms-text-primary">
-                              ${item.price}
+                              {item.price.toLocaleString("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
+                              })}
                             </span>
                           )}
                         </div>
@@ -260,7 +315,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                         )}
                         {!item.description && item.status !== "SOLD OUT" && (
                           <p className="text-base font-bold text-irms-text-primary mb-2">
-                            ${item.price}
+                            {item.price.toLocaleString("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
+                            })}
                           </p>
                         )}
 
@@ -285,7 +343,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                               onClick={() => addToCart(item)}
                               className="w-9 h-9 rounded-lg bg-irms-green text-white flex items-center justify-center hover:bg-irms-green/80 transition-colors cursor-pointer"
                             >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
                                 <line x1="12" y1="5" x2="12" y2="19" />
                                 <line x1="5" y1="12" x2="19" y2="12" />
                               </svg>
@@ -373,22 +440,24 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 Subtotal
               </span>
               <span className="text-lg font-bold text-irms-text-primary">
-                ${subtotal.toFixed(2)}
+                {subtotal.toLocaleString("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
+                })}
               </span>
             </div>
             <button
               onClick={handleFireToKitchen}
               disabled={isSubmitting || cart.length === 0}
               className={`flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl transition-colors duration-500 text-sm text-white font-bold cursor-pointer
-                ${isSubmitting || cart.length === 0 
-                  ? "bg-gray-400 cursor-not-allowed" 
-                  : "bg-linear-to-r from-irms-green to-irms-green/80 hover:from-irms-green/80 hover:to-irms-green"}`}
+                ${
+                  isSubmitting || cart.length === 0
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-linear-to-r from-irms-green to-irms-green/80 hover:from-irms-green/80 hover:to-irms-green"
+                }`}
             >
               <Flame className="w-4 h-4" />
               {isSubmitting ? "SENDING..." : "CONFIRM & FIRE TO KITCHEN"}
-            </button>
-            <button className="w-full text-sm font-semibold text-irms-text-primary hover:text-irms-text-primary/80 py-2 transition-colors cursor-pointer">
-              SAVE AS DRAFT
             </button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { DishResponse, OrderResponse } from '@/types/api.types';
+import { DishResponse, OrderResponse } from '@/types/menuOrder.types';
 
 export const MOCK_DISHES: DishResponse[] = [
   { dishId: 1, name: 'Wild Sea Scallops', category: 'Appetizer', basePrice: 42, available: true },

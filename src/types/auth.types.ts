@@ -1,5 +1,7 @@
 export interface AuthResponse {
   token: string;
+  role: string;
+  fullName: string;
 }
 
 export interface LoginRequest {
@@ -12,4 +14,5 @@ export interface RegisterRequest {
   password?: string;
   fullName?: string;
   phoneNumber?: string;
+  role?: string;
 }
