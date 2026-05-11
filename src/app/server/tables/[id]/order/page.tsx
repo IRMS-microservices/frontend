@@ -394,8 +394,14 @@ export default function OrderPage({
                 className="border-b border-irms-border pb-4 flex flex-col gap-2"
               >
                 <div className="flex items-start justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{c.item.image}</span>
+                  <div className="flex items-center gap-5">
+                    <Image
+                      src={c.item.image}
+                      alt={c.item.name}
+                      width={120}
+                      height={100}
+                      className="rounded-lg"
+                    />
                     <div className="flex flex-col gap-2">
                       <p className="text-sm font-semibold text-irms-text-primary">
                         {c.item.name}

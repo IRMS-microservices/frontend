@@ -6,6 +6,7 @@ import { JSX, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { OrderService } from "@/services/order.service";
 import { OrderResponse } from "@/types/menuOrder.types";
+import { CustomerService } from "@/services/customer.service";
 
 type PaymentMethod = "CREDIT CARD" | "QR CODE" | "CASH" | "DIGITAL WALLET";
 
@@ -58,6 +59,10 @@ export default function PaymentPage({
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>("CREDIT CARD");
   const [activeOrder, setActiveOrder] = useState<OrderResponse | null>(null);
+  const [displayCustomerId, setDisplayCustomerId] = useState<number | null>(
+    null,
+  );
+  const [customerName, setCustomerName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -79,6 +84,44 @@ export default function PaymentPage({
     };
     fetchOrder();
   }, [tableId]);
+
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      let cid = activeOrder?.customerId;
+
+      // Fallback to localStorage if no activeOrder or no customerId in activeOrder
+      if (!cid && typeof window !== "undefined") {
+        try {
+          const saved = localStorage.getItem(`table_guest_${tableId}`);
+          if (saved) {
+            const localGuest = JSON.parse(saved);
+            cid = localGuest.customerId;
+          }
+        } catch (e) {}
+      }
+
+      setDisplayCustomerId(cid || null);
+
+      if (cid) {
+        try {
+          const response = await CustomerService.getCustomerById(cid);
+          if (response.success) {
+            const customerData = response.data;
+            const formattedName =
+              customerData.gender === "Male"
+                ? `Mr. ${customerData.name}`
+                : `Ms. ${customerData.name}`;
+            setCustomerName(formattedName);
+          }
+        } catch (err) {
+          console.error("Failed to fetch customer", err);
+        }
+      } else {
+        setCustomerName(null);
+      }
+    };
+    fetchCustomer();
+  }, [activeOrder, tableId]);
 
   const subtotal = activeOrder
     ? activeOrder.items.reduce(
@@ -220,9 +263,12 @@ export default function PaymentPage({
             Table {tableId}
           </h2>
           <div className="flex items-center gap-3 text-sm text-irms-text-muted mb-8">
-            <span>Server: Julian</span>
             <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
-            <span>Customer #{activeOrder?.customerId || "Walk-in"}</span>
+            <span>
+              Customer:{" "}
+              {customerName ||
+                (displayCustomerId ? `#${displayCustomerId}` : "Walk-in")}
+            </span>
           </div>
 
           {loading ? (

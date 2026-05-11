@@ -97,6 +97,24 @@ export default function TablesPage() {
           const timeString =
             diffHours > 0 ? `${diffHours}h ${diffMins}m` : `${diffMins}m`;
 
+          let localGuestDisplay = null;
+          if (!activeOrder && typeof window !== "undefined") {
+            try {
+              const saved = localStorage.getItem(`table_guest_${bt.tableId}`);
+              if (saved) {
+                const lg = JSON.parse(saved);
+                if (lg.name) {
+                  localGuestDisplay =
+                    lg.gender === "Male"
+                      ? `Mr. ${lg.name}`
+                      : lg.gender === "Female"
+                        ? `Ms. ${lg.name}`
+                        : lg.name;
+                }
+              }
+            } catch (e) {}
+          }
+
           return {
             id: bt.tableId,
             seats: bt.capacity,
@@ -105,9 +123,11 @@ export default function TablesPage() {
             time: activeOrder ? timeString : "",
             guest: customer
               ? customerDisplay
-              : activeOrder
-                ? "Active Order"
-                : "Ready for Service",
+              : localGuestDisplay
+                ? localGuestDisplay
+                : activeOrder
+                  ? "Active Order"
+                  : "Ready for Service",
             hasAlert: bt.status === TableStatus.WAITING,
           };
         });

@@ -106,17 +106,9 @@ const navItemsByRole: Record<
 
 interface AppSidebarProps {
   role: Role;
-  user?: {
-    initials: string;
-    name: string;
-    title: string;
-  };
 }
 
-export function Sidebar({
-  role,
-  user = { initials: "JV", name: "Julian Vane", title: "SENIOR HOST" },
-}: AppSidebarProps) {
+export function Sidebar({ role }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const navItems = navItemsByRole[role];
@@ -161,15 +153,6 @@ export function Sidebar({
       </nav>
 
       <div className="px-4 pb-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-full bg-irms-green-light border-2 border-[#a7c4b5] flex items-center justify-center text-white text-sm font-bold">
-            {user.initials}
-          </div>
-          <div>
-            <p className="text-white text-sm font-semibold">{user.name}</p>
-            <p className="text-[#a7c4b5] text-xs">{user.title}</p>
-          </div>
-        </div>
         <button
           onClick={handleLogout}
           className="flex items-center gap-2.5 py-1.5 mt-2 text-xs text-[#a7c4b5] hover:text-white tracking-wider font-medium transition-colors w-full cursor-pointer"

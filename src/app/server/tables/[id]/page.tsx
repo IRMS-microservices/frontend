@@ -190,7 +190,7 @@ export default function TableDetailPage({
           phone: g.phone,
         });
         customerId = customerRes.data.customerId;
-        
+
         // Save to localStorage immediately
         localStorage.setItem(
           `table_guest_${tableId}`,
@@ -361,13 +361,13 @@ export default function TableDetailPage({
                   </Link>
                   <button
                     onClick={async () => {
-                      if (activeOrder) {
-                        try {
-                          await TableService.updateTableStatus(
-                            parseInt(tableId),
-                            TableStatus.AVAILABLE,
-                          );
-                        } catch (e) {}
+                      try {
+                        await TableService.updateTableStatus(
+                          parseInt(tableId),
+                          TableStatus.AVAILABLE,
+                        );
+                      } catch (e) {
+                        console.error("Failed to update table status", e);
                       }
                       localStorage.removeItem(`table_guest_${tableId}`);
                       localStorage.removeItem(`table_cart_${tableId}`);
