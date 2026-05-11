@@ -24,10 +24,6 @@ export default function LoginPage() {
     try {
       const response = await AuthService.login({ username, password });
       if (response.success) {
-        if (response.data && response.data.token) {
-          localStorage.setItem("token", response.data.token);
-        }
-        // Redirect based on role
         if (response.data?.role === "ADMIN") {
           router.push("/admin/dashboard");
         } else if (response.data?.role === "KITCHEN_STAFF") {

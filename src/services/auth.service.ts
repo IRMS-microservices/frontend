@@ -1,4 +1,4 @@
-import apiClient from './apiClient';
+import apiClient, { clearSession, saveSession } from './apiClient';
 import { ApiResponse } from '../types/common.types';
 import { LoginRequest, AuthResponse, RegisterRequest } from '../types/auth.types';
 
@@ -8,7 +8,11 @@ export const AuthService = {
    */
   login: async (request: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
     const response = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', request);
-    return response.data;
+    const loginRes = response.data
+    if (loginRes.success) {
+      saveSession(loginRes.data.token, loginRes.data.role);
+    }
+    return loginRes;
   },
 
   /**
@@ -16,6 +20,7 @@ export const AuthService = {
    */
   logout: async (): Promise<ApiResponse<void>> => {
     const response = await apiClient.post<ApiResponse<void>>('/auth/logout');
+    clearSession();
     return response.data;
   },
 

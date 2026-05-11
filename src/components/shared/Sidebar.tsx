@@ -116,11 +116,9 @@ export function Sidebar({ role }: AppSidebarProps) {
   const handleLogout = async () => {
     try {
       await AuthService.logout();
+      router.push("/login");
     } catch (error) {
       console.error("Logout failed:", error);
-    } finally {
-      localStorage.removeItem("token");
-      router.push("/login");
     }
   };
 

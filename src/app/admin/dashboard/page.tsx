@@ -388,7 +388,7 @@ export default function AdminDashboardPage() {
                       className="w-full bg-[#f9fafb] border border-irms-border rounded-lg px-3 py-2.5 text-sm text-irms-text-primary focus:border-irms-green focus:outline-none transition-colors"
                     >
                       <option value="SERVER">Server</option>
-                      <option value="KITCHEN">Kitchen</option>
+                      <option value="KITCHEN_STAFF">Kitchen Staff</option>
                       <option value="ADMIN">Admin</option>
                     </select>
                   </div>

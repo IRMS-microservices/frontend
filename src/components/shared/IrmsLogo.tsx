@@ -1,3 +1,5 @@
+"use client";
+
 import { Wine } from "lucide-react";
 
 export function IrmsLogo({

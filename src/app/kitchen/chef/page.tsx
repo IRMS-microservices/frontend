@@ -1,86 +1,19 @@
 "use client";
 
 import { Topbar } from "@/components/shared/Topbar";
-import { useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { KitchenService } from "@/services/kitchen.service";
+import { OrderService } from "@/services/order.service";
+import {
+  KitchenOrderResponse,
+  KitchenOrderStatus,
+} from "@/types/kitchen.types";
+
+// ---------------------------------------------------------------------------
+// Station filter
+// ---------------------------------------------------------------------------
 
 type Station = "ALL STATIONS" | "GRILL" | "SALAD" | "FRYER" | "DESSERT";
-
-interface TableRow {
-  tableNum: number;
-  modifiers?: string;
-  isRush?: boolean;
-  qty: number;
-}
-
-interface KitchenItem {
-  id: number;
-  name: string;
-  station: string;
-  stationColor: string;
-  tables: TableRow[];
-  totalQty: number;
-  timer: string;
-  isOverdue?: boolean;
-}
-
-const KITCHEN_ITEMS: KitchenItem[] = [
-  {
-    id: 1,
-    name: "Wagyu Ribeye",
-    station: "GRILL STATION",
-    stationColor: "text-[#f97316]",
-    tables: [
-      { tableNum: 12, modifiers: "Medium Rare", qty: 1 },
-      { tableNum: 8, modifiers: "Medium", qty: 2 },
-    ],
-    totalQty: 3,
-    timer: "14:22",
-    isOverdue: true,
-  },
-  {
-    id: 2,
-    name: "Lobster Bisque",
-    station: "FRYER / HOT BOX",
-    stationColor: "text-[#6b7280]",
-    tables: [
-      { tableNum: 22, qty: 4 },
-      { tableNum: 4, qty: 1 },
-    ],
-    totalQty: 5,
-    timer: "09:45",
-  },
-  {
-    id: 3,
-    name: "Burrata Salad",
-    station: "SALAD STATION",
-    stationColor: "text-green-600",
-    tables: [{ tableNum: 15, isRush: true, qty: 2 }],
-    totalQty: 2,
-    timer: "03:10",
-  },
-  {
-    id: 4,
-    name: "Truffle Fries",
-    station: "FRYER STATION",
-    stationColor: "text-[#6b7280]",
-    tables: [
-      { tableNum: 31, qty: 1 },
-      { tableNum: 33, qty: 1 },
-      { tableNum: 11, qty: 1 },
-    ],
-    totalQty: 4,
-    timer: "06:22",
-  },
-  {
-    id: 5,
-    name: "Valrhona Soufflé",
-    station: "DESSERT STATION",
-    stationColor: "text-purple-600",
-    tables: [{ tableNum: 19, modifiers: "Celebration", qty: 1 }],
-    totalQty: 1,
-    timer: "01:50",
-  },
-];
 
 const STATIONS: Station[] = [
   "ALL STATIONS",
@@ -90,34 +23,370 @@ const STATIONS: Station[] = [
   "DESSERT",
 ];
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** One row inside a ticket: which table ordered this dish and how many */
+interface TicketRow {
+  tableId: number;
+  kitchenOrderItemId: number;
+  quantity: number;
+}
+
+/**
+ * A ticket groups the same dish ordered within a 3-minute window.
+ * Key format: "<dishName>-<groupFireTimeMs>"
+ */
+interface Ticket {
+  key: string;
+  dishName: string;
+  /** fireTime (ms) of the very first item in this group – used for timing */
+  groupFireTimeMs: number;
+  rows: TicketRow[];
+  totalQty: number;
+  /** Station label derived from item data (optional – filters against STATIONS) */
+  station?: string;
+  /** true if any item has been bumped (all advanceItemStatus calls succeeded) */
+  bumped: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: build / append to the ticket map
+// ---------------------------------------------------------------------------
+
+const THREE_MINUTES_MS = 3 * 60 * 1000;
+
+/**
+ * Given the current map and a new KitchenOrderResponse + orderId→tableId lookup,
+ * append every item from that order into the map following the grouping rules.
+ * Returns the *new* map (does not mutate the input).
+ */
+function appendOrderToMap(
+  prevMap: Map<string, Ticket>,
+  order: KitchenOrderResponse,
+  orderIdToTableId: Map<number, number>,
+): Map<string, Ticket> {
+  const map = new Map(prevMap);
+  const tableId = orderIdToTableId.get(order.orderId) ?? 0;
+  const orderFireMs = new Date(order.fireTime).getTime();
+
+  for (const item of order.items) {
+    const dishName = item.dishName;
+
+    // Round fireTime to 3-minute bucket for direct O(1) key access
+    const bucketMs =
+      Math.floor(orderFireMs / THREE_MINUTES_MS) * THREE_MINUTES_MS;
+    const key = `${dishName}-${bucketMs}`;
+
+    const existing = map.get(key); // ← direct access, no for loop
+
+    if (existing && !existing.bumped) {
+      map.set(key, {
+        ...existing,
+        rows: [
+          ...existing.rows,
+          { tableId, kitchenOrderItemId: item.id, quantity: item.quantity },
+        ],
+        totalQty: existing.totalQty + item.quantity,
+      });
+    } else {
+      map.set(key, {
+        key,
+        dishName,
+        groupFireTimeMs: orderFireMs,
+        rows: [
+          { tableId, kitchenOrderItemId: item.id, quantity: item.quantity },
+        ],
+        totalQty: item.quantity,
+        bumped: false,
+      });
+    }
+  }
+
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Elapsed-time hook – returns a live "MM:SS" string for a given start epoch ms
+// ---------------------------------------------------------------------------
+
+function useElapsed(startMs: number): string {
+  const [elapsed, setElapsed] = useState(() => Date.now() - startMs);
+
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(Date.now() - startMs), 1000);
+    return () => clearInterval(id);
+  }, [startMs]);
+
+  const totalSec = Math.max(0, Math.floor(elapsed / 1000));
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+  const ss = String(totalSec % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: one ticket card
+// ---------------------------------------------------------------------------
+
+function TicketCard({
+  ticket,
+  onBump,
+}: {
+  ticket: Ticket;
+  onBump: (ticket: Ticket) => void;
+}) {
+  const timer = useElapsed(ticket.groupFireTimeMs);
+  const [mm, ss] = timer.split(":").map(Number);
+  const isOverdue = mm >= 10;
+
+  return (
+    <div
+      className={`bg-white rounded-xl border-2 p-5 transition-all ${
+        isOverdue ? "border-red-400" : "border-irms-border"
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-1">
+        <h3 className="font-bold text-irms-text-primary text-base leading-tight">
+          {ticket.dishName}
+        </h3>
+        <span className="text-2xl font-bold text-irms-text-primary ml-2">
+          ×{ticket.totalQty}
+        </span>
+      </div>
+
+      {/* Table rows */}
+      <div className="space-y-2 mb-4 mt-3">
+        {ticket.rows.map((row) => (
+          <div
+            key={`${row.tableId}-${row.kitchenOrderItemId}`}
+            className="flex items-center justify-between bg-[#f9fafb] rounded-lg px-3 py-1.5"
+          >
+            <span className="text-sm font-semibold text-[#374151]">
+              Table {String(row.tableId).padStart(2, "0")}
+            </span>
+            <span className="text-sm font-semibold text-[#374151]">
+              ×{row.quantity}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between">
+        <span
+          className={`flex items-center gap-1.5 text-sm font-bold ${
+            isOverdue ? "text-red-500" : "text-[#374151]"
+          }`}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          {timer}
+        </span>
+        <button
+          onClick={() => onBump(ticket)}
+          className="px-3 py-1.5 bg-irms-green hover:bg-irms-green-dark text-white text-xs font-bold tracking-wider rounded-lg transition-colors cursor-pointer"
+        >
+          BUMP
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Longest-wait chip – needs live timer, so it's its own tiny component
+// ---------------------------------------------------------------------------
+
+function LongestWaitChip({ startMs }: { startMs: number }) {
+  const timer = useElapsed(startMs);
+  return (
+    <div className="flex items-center gap-3 bg-white border border-irms-border rounded-xl shadow-lg px-4 py-2.5">
+      <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </div>
+      <div>
+        <p className="text-xs text-irms-text-secondary font-semibold">
+          LONGEST WAIT
+        </p>
+        <p className="text-lg font-bold text-red-500">{timer}</p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
 export default function ChefViewPage() {
   const [activeStation, setActiveStation] = useState<Station>("ALL STATIONS");
-  const [bumpedItems, setBumpedItems] = useState<number[]>([]);
+  const [ticketMap, setTicketMap] = useState<Map<string, Ticket>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [bumpingKeys, setBumpingKeys] = useState<Set<string>>(new Set());
 
-  const longestWaitItem = KITCHEN_ITEMS.filter(
-    (item) => !bumpedItems.includes(item.id),
-  ).sort((a, b) => {
-    const toSecs = (t: string) => {
-      const [m, s] = t.split(":").map(Number);
-      return m * 60 + s;
+  // Keep a ref so the WS callback can always see the latest map + lookup
+  const ticketMapRef = useRef(ticketMap);
+  const orderIdToTableIdRef = useRef<Map<number, number>>(new Map());
+
+  useEffect(() => {
+    ticketMapRef.current = ticketMap;
+  }, [ticketMap]);
+
+  // ---------------------------------------------------------------------------
+  // Initial load
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const [kitchenRes, orderRes] = await Promise.all([
+          KitchenService.listOrders(KitchenOrderStatus.PENDING),
+          OrderService.getOrders(undefined, "Waiting"),
+        ]);
+
+        if (cancelled) return;
+
+        // Build orderId → tableId lookup from Waiting orders
+        const lookup = new Map<number, number>();
+        if (orderRes.data) {
+          for (const o of orderRes.data) {
+            lookup.set(o.orderId, o.tableId);
+          }
+        }
+        orderIdToTableIdRef.current = lookup;
+
+        // Sort by fireTime ascending
+        const sorted = (kitchenRes.data ?? [])
+          .slice()
+          .sort(
+            (a, b) =>
+              new Date(a.fireTime).getTime() - new Date(b.fireTime).getTime(),
+          );
+
+        // Build ticket map
+        let map = new Map<string, Ticket>();
+        for (const order of sorted) {
+          map = appendOrderToMap(map, order, lookup);
+        }
+
+        setTicketMap(map);
+      } catch (err) {
+        console.error("Failed to load kitchen orders", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
     };
-    return toSecs(b.timer) - toSecs(a.timer);
-  })[0];
+  }, []);
 
-  const totalItems = KITCHEN_ITEMS.filter(
-    (i) => !bumpedItems.includes(i.id),
-  ).reduce((sum, i) => sum + i.totalQty, 0);
+  // ---------------------------------------------------------------------------
+  // WebSocket – listen for newly created kitchen orders
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const unsubscribe = KitchenService.onKitchenOrderCreated(
+      (newOrder: KitchenOrderResponse) => {
+        // For new WS orders: if orderId not in lookup yet, tableId will be 0
+        setTicketMap((prev) =>
+          appendOrderToMap(prev, newOrder, orderIdToTableIdRef.current),
+        );
+      },
+    );
 
-  const visibleItems = KITCHEN_ITEMS.filter((item) => {
-    if (bumpedItems.includes(item.id)) return false;
+    KitchenService.connect();
+
+    return () => {
+      unsubscribe();
+      KitchenService.disconnect();
+    };
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Bump handler
+  // ---------------------------------------------------------------------------
+  const handleBump = useCallback(async (ticket: Ticket) => {
+    setBumpingKeys((prev) => new Set(prev).add(ticket.key));
+    try {
+      await Promise.all(
+        ticket.rows.map((row) =>
+          KitchenService.advanceItemStatus(row.kitchenOrderItemId),
+        ),
+      );
+      setTicketMap((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(ticket.key);
+        if (existing) next.set(ticket.key, { ...existing, bumped: true });
+        return next;
+      });
+    } catch (err) {
+      console.error("Bump failed", err);
+    } finally {
+      setBumpingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(ticket.key);
+        return next;
+      });
+    }
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Derived data
+  // ---------------------------------------------------------------------------
+  const activeTickets = Array.from(ticketMap.values()).filter((t) => {
+    if (t.bumped) return false;
     if (activeStation === "ALL STATIONS") return true;
-    return item.station.toUpperCase().includes(activeStation);
+    return t.station?.toUpperCase().includes(activeStation) ?? false;
   });
 
+  const totalItems = activeTickets.reduce((sum, t) => sum + t.totalQty, 0);
+
+  // Longest wait is based on ALL non-bumped tickets, not just the filtered view
+  const allActiveTickets = Array.from(ticketMap.values()).filter(
+    (t) => !t.bumped,
+  );
+  const earliestFireMs =
+    allActiveTickets.length > 0
+      ? Math.min(...allActiveTickets.map((t) => t.groupFireTimeMs))
+      : null;
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <div className="flex flex-col h-full relative">
       {/* Top bar */}
       <Topbar title="Chef View" />
+
       {/* Station filter */}
       <div className="px-8 pt-5 pb-0 flex items-center gap-2">
         {STATIONS.map((s) => (
@@ -137,93 +406,15 @@ export default function ChefViewPage() {
 
       {/* Items grid */}
       <div className="flex-1 p-8 overflow-y-auto">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {visibleItems.map((item) => (
-            <div
-              key={item.id}
-              className={`bg-white rounded-xl border-2 p-5 transition-all ${
-                item.isOverdue ? "border-red-400" : "border-irms-border"
-              }`}
-            >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-1">
-                <h3 className="font-bold text-irms-text-primary text-base leading-tight">
-                  {item.name}
-                </h3>
-                <span className="text-2xl font-bold text-irms-text-primary ml-2">
-                  ×{item.totalQty}
-                </span>
-              </div>
-              <p
-                className={`text-xs font-bold tracking-wider mb-4 ${item.stationColor}`}
-              >
-                {item.station}
-              </p>
-
-              {/* Table rows */}
-              <div className="space-y-2 mb-4">
-                {item.tables.map((row) => (
-                  <div
-                    key={row.tableNum}
-                    className="flex items-center justify-between bg-[#f9fafb] rounded-lg px-3 py-1.5"
-                  >
-                    <span className="text-sm font-semibold text-[#374151]">
-                      Table {String(row.tableNum).padStart(2, "0")}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {row.modifiers && (
-                        <span className="text-xs text-irms-text-secondary">
-                          {row.modifiers}
-                        </span>
-                      )}
-                      {row.isRush && (
-                        <span className="text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
-                          Rush
-                        </span>
-                      )}
-                      <span className="text-sm font-semibold text-[#374151]">
-                        ×{row.qty}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between">
-                <span
-                  className={`flex items-center gap-1.5 text-sm font-bold ${item.isOverdue ? "text-red-500" : "text-[#374151]"}`}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                  {item.timer}
-                </span>
-                <button
-                  onClick={() => setBumpedItems((prev) => [...prev, item.id])}
-                  className="px-3 py-1.5 bg-irms-green hover:bg-irms-green-dark text-white text-xs font-bold tracking-wider rounded-lg transition-colors cursor-pointer"
-                >
-                  BUMP ITEM
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {/* Recent history placeholder */}
-          <div className="bg-white rounded-xl border-2 border-dashed border-irms-border p-5 flex flex-col items-center justify-center gap-2 min-h-[180px]">
+        {loading ? (
+          <div className="flex items-center justify-center h-48 text-irms-text-secondary font-semibold">
+            Loading kitchen orders…
+          </div>
+        ) : activeTickets.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 gap-2 text-irms-text-secondary">
             <svg
-              width="28"
-              height="28"
+              width="36"
+              height="36"
               viewBox="0 0 24 24"
               fill="none"
               stroke="#d1d5db"
@@ -234,45 +425,33 @@ export default function ChefViewPage() {
               <polyline points="1 4 1 10 7 10" />
               <path d="M3.51 15a9 9 0 1 0 .49-3.67" />
             </svg>
-            <p className="text-xs font-bold text-irms-text-secondary tracking-widest">
-              RECENT HISTORY
-            </p>
-            <p className="text-xs text-irms-text-secondary">
-              Tap to recall last item
+            <p className="text-xs font-bold tracking-widest">
+              ALL CLEAR — NO PENDING ITEMS
             </p>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {activeTickets
+              .filter((t) =>
+                activeStation === "ALL STATIONS"
+                  ? true
+                  : t.station === activeStation,
+              )
+              .map((ticket) => (
+                <TicketCard
+                  key={ticket.key}
+                  ticket={ticket}
+                  onBump={bumpingKeys.has(ticket.key) ? () => {} : handleBump}
+                />
+              ))}
+          </div>
+        )}
       </div>
 
       {/* Floating bottom chips */}
       <div className="absolute bottom-6 right-6 flex flex-col gap-2 items-end">
-        {longestWaitItem && (
-          <div className="flex items-center gap-3 bg-white border border-irms-border rounded-xl shadow-lg px-4 py-2.5">
-            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#ef4444"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-xs text-irms-text-secondary font-semibold">
-                LONGEST WAIT
-              </p>
-              <p className="text-lg font-bold text-red-500">
-                {longestWaitItem.timer}
-              </p>
-            </div>
-          </div>
+        {earliestFireMs !== null && (
+          <LongestWaitChip startMs={earliestFireMs} />
         )}
         <div className="flex items-center gap-3 bg-irms-green rounded-xl shadow-lg px-4 py-2.5">
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">

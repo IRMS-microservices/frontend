@@ -1,6 +1,22 @@
 import apiClient from './apiClient';
 import { CreateOrderRequest, OrderResponse } from '../types/menuOrder.types';
 import { ApiResponse } from '@/types/common.types';
+import { io, Socket } from 'socket.io-client';
+
+const SOCKET_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:8099';
+
+let socket: Socket | null = null;
+
+function getSocket(): Socket {
+  if (!socket || !socket.connected) {
+    socket = io(SOCKET_URL, {
+      transports: ['websocket'],
+      autoConnect: true,
+    });
+  }
+  return socket;
+}
 
 export const OrderService = {
   /**
@@ -42,5 +58,36 @@ export const OrderService = {
   updatePaymentStatus: async (orderId: number, paymentStatus: string): Promise<ApiResponse<OrderResponse>> => {
     const response = await apiClient.patch(`/orders/${orderId}/payment`, { paymentStatus });
     return response.data;
-  }
+  },
+
+  /**
+       * Connect to the SocketIO server.
+       * Call once when the kitchen page mounts.
+       */
+  connect(): Socket {
+    return getSocket();
+  },
+
+  /**
+   * Disconnect and destroy the SocketIO socket.
+   * Call when the kitchen page unmounts.
+   */
+  disconnect(): void {
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+  },
+
+  /**
+     * Subscribe to ORDER_SERVICE_STATUS_CHANGED events.
+     * Emitted by the backend whenever a Order status changes.
+     */
+  onOrderServiceStatusChanged(
+    callback: (order: OrderResponse) => void
+  ): () => void {
+    const s = getSocket();
+    s.on('ORDER_SERVICE_STATUS_CHANGED', callback);
+    return () => s.off('ORDER_SERVICE_STATUS_CHANGED', callback);
+  },
 };

@@ -123,6 +123,34 @@ export default function PaymentPage({
     fetchCustomer();
   }, [activeOrder, tableId]);
 
+  // ── Real-time: listen for service-status changes from the kitchen ──
+  useEffect(() => {
+    OrderService.connect();
+
+    const unsubscribe = OrderService.onOrderServiceStatusChanged(
+      (updatedOrder: OrderResponse) => {
+        // Only update if it's for the current table
+        if (updatedOrder.tableId !== parseInt(tableId)) return;
+
+        setActiveOrder((prev) => {
+          if (prev && prev.orderId === updatedOrder.orderId) {
+            return { ...prev, ...updatedOrder };
+          }
+          // If no active order yet, pick up this one if it's in a relevant status
+          if (!prev && (updatedOrder.serviceStatus === "Waiting" || updatedOrder.serviceStatus === "Eating")) {
+            return updatedOrder;
+          }
+          return prev;
+        });
+      }
+    );
+
+    return () => {
+      unsubscribe();
+      OrderService.disconnect();
+    };
+  }, []);
+
   const subtotal = activeOrder
     ? activeOrder.items.reduce(
         (sum, item) => sum + item.salePrice * item.quantity,
