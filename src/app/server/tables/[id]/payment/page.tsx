@@ -137,12 +137,16 @@ export default function PaymentPage({
             return { ...prev, ...updatedOrder };
           }
           // If no active order yet, pick up this one if it's in a relevant status
-          if (!prev && (updatedOrder.serviceStatus === "Waiting" || updatedOrder.serviceStatus === "Eating")) {
+          if (
+            !prev &&
+            (updatedOrder.serviceStatus === "Waiting" ||
+              updatedOrder.serviceStatus === "Eating")
+          ) {
             return updatedOrder;
           }
           return prev;
         });
-      }
+      },
     );
 
     return () => {
@@ -175,6 +179,7 @@ export default function PaymentPage({
     } catch (err) {
       console.error("Payment failed", err);
       alert("Payment failed. Please try again.");
+    } finally {
       setIsProcessing(false);
     }
   };

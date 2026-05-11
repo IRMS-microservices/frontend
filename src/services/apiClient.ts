@@ -61,4 +61,18 @@ apiClient.interceptors.response.use(
   }
 );
 
+apiClient.interceptors.request.use((config) => {
+  if (config.params) {
+    config.params = Object.fromEntries(
+      Object.entries(config.params).filter(
+        ([_, value]) =>
+          value !== undefined &&
+          value !== null &&
+          value !== ""
+      )
+    );
+  }
+  return config;
+});
+
 export default apiClient;

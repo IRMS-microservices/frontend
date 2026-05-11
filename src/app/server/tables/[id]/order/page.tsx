@@ -412,7 +412,10 @@ export default function OrderPage({
                     </div>
                   </div>
                   <span className="text-sm font-bold text-irms-text-primary">
-                    ${c.item.price * c.quantity}
+                    {(c.item.price * c.quantity).toLocaleString("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    })}
                   </span>
                 </div>
                 <div className="flex gap-3 text-xs font-semibold ml-7">

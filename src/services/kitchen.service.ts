@@ -14,9 +14,13 @@ let socket: Socket | null = null;
 
 function getSocket(): Socket {
     if (!socket || !socket.connected) {
+        const token = sessionStorage.getItem("token");
         socket = io(SOCKET_URL, {
             transports: ['websocket'],
             autoConnect: true,
+            query: {
+                token: token
+            }
         });
     }
     return socket;
