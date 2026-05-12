@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 import { io, Socket } from 'socket.io-client';
-import { ApiResponse } from '@/types/common.types';
+import { ApiResponse, SocketEvent } from '@/types/common.types';
 import {
     KitchenOrderResponse,
     KitchenOrderItemResponse,
@@ -103,24 +103,24 @@ export const KitchenService = {
      * Subscribe to ORDER_STATUS_CHANGED events.
      * Emitted by the backend whenever a KitchenOrder status changes.
      */
-    onOrderStatusChanged(
+    onKitchenOrderStatusChanged(
         callback: (order: KitchenOrderResponse) => void
     ): () => void {
         const s = getSocket();
-        s.on('ORDER_STATUS_CHANGED', callback);
-        return () => s.off('ORDER_STATUS_CHANGED', callback);
+        s.on(SocketEvent.KITCHEN_ORDER_STATUS_CHANGED, callback);
+        return () => s.off(SocketEvent.KITCHEN_ORDER_STATUS_CHANGED, callback);
     },
 
     /**
      * Subscribe to ITEM_STATUS_CHANGED events.
      * Emitted by the backend whenever a KitchenOrderItem status changes.
      */
-    onItemStatusChanged(
+    onKitchenOrderItemStatusChanged(
         callback: (item: KitchenOrderItemResponse) => void
     ): () => void {
         const s = getSocket();
-        s.on('ITEM_STATUS_CHANGED', callback);
-        return () => s.off('ITEM_STATUS_CHANGED', callback);
+        s.on(SocketEvent.KITCHEN_ORDER_ITEM_STATUS_CHANGED, callback);
+        return () => s.off(SocketEvent.KITCHEN_ORDER_ITEM_STATUS_CHANGED, callback);
     },
 
     /**
@@ -131,7 +131,7 @@ export const KitchenService = {
         callback: (order: KitchenOrderResponse) => void
     ): () => void {
         const s = getSocket();
-        s.on('KITCHEN_ORDER_CREATED', callback);
-        return () => s.off('KITCHEN_ORDER_CREATED', callback);
+        s.on(SocketEvent.KITCHEN_ORDER_CREATED, callback);
+        return () => s.off(SocketEvent.KITCHEN_ORDER_CREATED, callback);
     },
 };

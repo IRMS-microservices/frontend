@@ -25,7 +25,7 @@ export default function ExpeditorViewPage() {
   const [loading, setLoading] = useState(true);
   const [bumpingIds, setBumpingIds] = useState<Set<number>>(new Set());
 
-  // ─── Initial load ─────────────────────────────────────────────────────────
+  // Initial load
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -40,7 +40,7 @@ export default function ExpeditorViewPage() {
 
       // Build a map orderId → tableId
       const tableMap = new Map<number, number>(
-        waitingOrders.map((o) => [o.orderId, o.tableId])
+        waitingOrders.map((o) => [o.orderId, o.tableId]),
       );
 
       const enriched: Ticket[] = kitchenOrders
@@ -65,32 +65,34 @@ export default function ExpeditorViewPage() {
     loadData();
   }, [loadData]);
 
-  // ─── WebSocket: listen for item status changes ────────────────────────────
+  // WebSocket: listen for item status changes
   useEffect(() => {
     KitchenService.connect();
 
-    const unsubscribeItem = KitchenService.onItemStatusChanged(
+    const unsubscribeItem = KitchenService.onKitchenOrderItemStatusChanged(
       (updated: KitchenOrderItemResponse) => {
         setTickets((prev) =>
           prev.map((ticket) => ({
             ...ticket,
             items: ticket.items.map((item) =>
-              item.id === updated.id ? { ...item, cookingStatus: updated.cookingStatus } : item
+              item.id === updated.id
+                ? { ...item, cookingStatus: updated.cookingStatus }
+                : item,
             ),
-          }))
+          })),
         );
-      }
+      },
     );
 
     // Optionally remove bumped tickets when their status advances
-    const unsubscribeOrder = KitchenService.onOrderStatusChanged(
+    const unsubscribeOrder = KitchenService.onKitchenOrderStatusChanged(
       (updatedOrder: KitchenOrderResponse) => {
         if (updatedOrder.status !== KitchenOrderStatus.PENDING) {
           setTickets((prev) =>
-            prev.filter((t) => t.kitchenOrderId !== updatedOrder.id)
+            prev.filter((t) => t.kitchenOrderId !== updatedOrder.id),
           );
         }
-      }
+      },
     );
 
     return () => {
@@ -100,7 +102,7 @@ export default function ExpeditorViewPage() {
     };
   }, []);
 
-  // ─── Bump ticket ──────────────────────────────────────────────────────────
+  // Bump ticket
   const handleBump = async (ticket: Ticket) => {
     if (bumpingIds.has(ticket.kitchenOrderId)) return;
     setBumpingIds((prev) => new Set(prev).add(ticket.kitchenOrderId));
@@ -111,7 +113,7 @@ export default function ExpeditorViewPage() {
       ]);
       // Optimistically remove the ticket
       setTickets((prev) =>
-        prev.filter((t) => t.kitchenOrderId !== ticket.kitchenOrderId)
+        prev.filter((t) => t.kitchenOrderId !== ticket.kitchenOrderId),
       );
     } catch (err) {
       console.error("Failed to bump ticket:", err);
@@ -124,7 +126,6 @@ export default function ExpeditorViewPage() {
     }
   };
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
   const canBump = (ticket: Ticket) =>
     ticket.items.length > 0 &&
     ticket.items.every((i) => i.cookingStatus === CookingStatus.COMPLETED);
@@ -140,7 +141,6 @@ export default function ExpeditorViewPage() {
     }
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full">
       <Topbar title="Expeditor View" />
@@ -246,7 +246,8 @@ export default function ExpeditorViewPage() {
                   {/* Items — simplified: name, qty, status */}
                   <div className="p-4 space-y-3 flex-1">
                     {ticket.items.map((item) => {
-                      const isReady = item.cookingStatus === CookingStatus.COMPLETED;
+                      const isReady =
+                        item.cookingStatus === CookingStatus.COMPLETED;
                       return (
                         <div
                           key={item.id}

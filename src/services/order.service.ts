@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 import { CreateOrderRequest, OrderResponse } from '../types/menuOrder.types';
-import { ApiResponse } from '@/types/common.types';
+import { ApiResponse, SocketEvent } from '@/types/common.types';
 import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL =
@@ -91,7 +91,7 @@ export const OrderService = {
     callback: (order: OrderResponse) => void
   ): () => void {
     const s = getSocket();
-    s.on('ORDER_SERVICE_STATUS_CHANGED', callback);
-    return () => s.off('ORDER_SERVICE_STATUS_CHANGED', callback);
+    s.on(SocketEvent.ORDER_SERVICE_STATUS_CHANGED, callback);
+    return () => s.off(SocketEvent.ORDER_SERVICE_STATUS_CHANGED, callback);
   },
 };

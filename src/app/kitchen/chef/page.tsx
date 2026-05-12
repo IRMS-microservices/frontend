@@ -8,20 +8,8 @@ import {
   KitchenOrderResponse,
   KitchenOrderStatus,
 } from "@/types/kitchen.types";
-
-// ---------------------------------------------------------------------------
-// Station filter
-// ---------------------------------------------------------------------------
-
-type Station = "ALL STATIONS" | "GRILL" | "SALAD" | "FRYER" | "DESSERT";
-
-const STATIONS: Station[] = [
-  "ALL STATIONS",
-  "GRILL",
-  "SALAD",
-  "FRYER",
-  "DESSERT",
-];
+import { OrderResponse } from "@/types/menuOrder.types";
+import useElapsed from "@/hooks/useElapsed";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,11 +39,42 @@ interface Ticket {
   bumped: boolean;
 }
 
+type Station = "ALL STATIONS" | "GRILL" | "SALAD" | "FRYER" | "DESSERT";
+
+const STATIONS: Station[] = [
+  "ALL STATIONS",
+  "GRILL",
+  "SALAD",
+  "FRYER",
+  "DESSERT",
+];
+
 // ---------------------------------------------------------------------------
 // Helper: build / append to the ticket map
 // ---------------------------------------------------------------------------
 
 const THREE_MINUTES_MS = 3 * 60 * 1000;
+
+// parse firetime Instant -> ISO
+function parseFireTime(fireTime: any): number {
+  if (!fireTime) return Date.now();
+
+  if (typeof fireTime === "object" && "epochSecond" in fireTime) {
+    return fireTime.epochSecond * 1000 + Math.floor(fireTime.nano / 1_000_000);
+  }
+
+  if (typeof fireTime === "string") {
+    return new Date(fireTime).getTime();
+  }
+
+  if (typeof fireTime === "number") {
+    return fireTime < 1_000_000_000_000
+      ? Math.floor(fireTime * 1000)
+      : fireTime;
+  }
+
+  return Date.now();
+}
 
 /**
  * Given the current map and a new KitchenOrderResponse + orderId→tableId lookup,
@@ -63,37 +82,31 @@ const THREE_MINUTES_MS = 3 * 60 * 1000;
  * Returns the *new* map (does not mutate the input).
  */
 function appendOrderToMap(
-  prevMap: Map<string, Ticket>,
+  map: Map<string, Ticket>,
   order: KitchenOrderResponse,
   orderIdToTableId: Map<number, number>,
-): Map<string, Ticket> {
-  const map = new Map(prevMap);
+): void {
   const tableId = orderIdToTableId.get(order.orderId) ?? 0;
-  const orderFireMs = new Date(order.fireTime).getTime();
+  console.log("Order firetime from socket: ", order.fireTime);
+  const orderFireMs = parseFireTime(order.fireTime);
+  const bucketMs =
+    Math.floor(orderFireMs / THREE_MINUTES_MS) * THREE_MINUTES_MS;
 
   for (const item of order.items) {
-    const dishName = item.dishName;
-
-    // Round fireTime to 3-minute bucket for direct O(1) key access
-    const bucketMs =
-      Math.floor(orderFireMs / THREE_MINUTES_MS) * THREE_MINUTES_MS;
-    const key = `${dishName}-${bucketMs}`;
-
-    const existing = map.get(key); // ← direct access, no for loop
+    const key = `${item.dishName}-${bucketMs}`;
+    const existing = map.get(key);
 
     if (existing && !existing.bumped) {
-      map.set(key, {
-        ...existing,
-        rows: [
-          ...existing.rows,
-          { tableId, kitchenOrderItemId: item.id, quantity: item.quantity },
-        ],
-        totalQty: existing.totalQty + item.quantity,
+      existing.rows.push({
+        tableId,
+        kitchenOrderItemId: item.id,
+        quantity: item.quantity,
       });
+      existing.totalQty += item.quantity;
     } else {
       map.set(key, {
         key,
-        dishName,
+        dishName: item.dishName,
         groupFireTimeMs: orderFireMs,
         rows: [
           { tableId, kitchenOrderItemId: item.id, quantity: item.quantity },
@@ -103,26 +116,6 @@ function appendOrderToMap(
       });
     }
   }
-
-  return map;
-}
-
-// ---------------------------------------------------------------------------
-// Elapsed-time hook – returns a live "MM:SS" string for a given start epoch ms
-// ---------------------------------------------------------------------------
-
-function useElapsed(startMs: number): string {
-  const [elapsed, setElapsed] = useState(() => Date.now() - startMs);
-
-  useEffect(() => {
-    const id = setInterval(() => setElapsed(Date.now() - startMs), 1000);
-    return () => clearInterval(id);
-  }, [startMs]);
-
-  const totalSec = Math.max(0, Math.floor(elapsed / 1000));
-  const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
-  const ss = String(totalSec % 60).padStart(2, "0");
-  return `${mm}:${ss}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +238,9 @@ function LongestWaitChip({ startMs }: { startMs: number }) {
 // ---------------------------------------------------------------------------
 
 export default function ChefViewPage() {
+  const pendingOrdersRef = useRef<Map<number, KitchenOrderResponse[]>>(
+    new Map(),
+  );
   const [activeStation, setActiveStation] = useState<Station>("ALL STATIONS");
   const [ticketMap, setTicketMap] = useState<Map<string, Ticket>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -291,9 +287,9 @@ export default function ChefViewPage() {
           );
 
         // Build ticket map
-        let map = new Map<string, Ticket>();
+        const map = new Map<string, Ticket>();
         for (const order of sorted) {
-          map = appendOrderToMap(map, order, lookup);
+          appendOrderToMap(map, order, lookup);
         }
 
         setTicketMap(map);
@@ -314,26 +310,57 @@ export default function ChefViewPage() {
   // WebSocket – listen for newly created kitchen orders
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    const unsubscribe = KitchenService.onKitchenOrderCreated(
+    const unsubscribeKitchen = KitchenService.onKitchenOrderCreated(
       (newOrder: KitchenOrderResponse) => {
-        // For new WS orders: if orderId not in lookup yet, tableId will be 0
-        setTicketMap((prev) =>
-          appendOrderToMap(prev, newOrder, orderIdToTableIdRef.current),
-        );
+        if (!orderIdToTableIdRef.current.has(newOrder.orderId)) {
+          // tableId not yet known — queue it
+          const queue = pendingOrdersRef.current.get(newOrder.orderId) ?? [];
+          queue.push(newOrder);
+          pendingOrdersRef.current.set(newOrder.orderId, queue);
+          return;
+        }
+
+        setTicketMap((prev) => {
+          const map = new Map(prev);
+          appendOrderToMap(map, newOrder, orderIdToTableIdRef.current);
+          return map;
+        });
+      },
+    );
+
+    const unsubscribeOrder = OrderService.onOrderServiceStatusChanged(
+      (order: OrderResponse) => {
+        if (!orderIdToTableIdRef.current.has(order.orderId)) {
+          orderIdToTableIdRef.current.set(order.orderId, order.tableId);
+
+          // Flush any queued kitchen orders that were waiting for this orderId
+          const pending = pendingOrdersRef.current.get(order.orderId);
+          if (pending?.length) {
+            setTicketMap((prev) => {
+              const map = new Map(prev);
+              for (const queued of pending) {
+                appendOrderToMap(map, queued, orderIdToTableIdRef.current);
+              }
+              return map;
+            });
+            pendingOrdersRef.current.delete(order.orderId); // cleanup after flush
+          }
+        }
       },
     );
 
     KitchenService.connect();
+    OrderService.connect();
 
     return () => {
-      unsubscribe();
+      unsubscribeKitchen();
+      unsubscribeOrder();
       KitchenService.disconnect();
+      OrderService.disconnect();
     };
   }, []);
 
-  // ---------------------------------------------------------------------------
   // Bump handler
-  // ---------------------------------------------------------------------------
   const handleBump = useCallback(async (ticket: Ticket) => {
     setBumpingKeys((prev) => new Set(prev).add(ticket.key));
     try {
@@ -359,9 +386,7 @@ export default function ChefViewPage() {
     }
   }, []);
 
-  // ---------------------------------------------------------------------------
   // Derived data
-  // ---------------------------------------------------------------------------
   const activeTickets = Array.from(ticketMap.values()).filter((t) => {
     if (t.bumped) return false;
     if (activeStation === "ALL STATIONS") return true;
@@ -379,9 +404,6 @@ export default function ChefViewPage() {
       ? Math.min(...allActiveTickets.map((t) => t.groupFireTimeMs))
       : null;
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   return (
     <div className="flex flex-col h-full relative">
       {/* Top bar */}

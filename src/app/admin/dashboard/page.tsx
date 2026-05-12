@@ -159,8 +159,8 @@ export default function AdminDashboardPage() {
         <div className="flex items-center gap-4">
           <span className="text-sm font-semibold">Welcome, Administrator</span>
           <button
-            onClick={() => {
-              AuthService.logout();
+            onClick={async () => {
+              await AuthService.logout();
               window.location.href = "/login";
             }}
             className="bg-white text-irms-green px-3 py-1.5 rounded-lg font-semibold hover:bg-irms-green-light hover:text-white transition-colors"
