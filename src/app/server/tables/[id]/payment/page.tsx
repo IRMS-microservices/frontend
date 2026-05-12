@@ -5,7 +5,11 @@ import Link from "next/link";
 import { JSX, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { OrderService } from "@/services/order.service";
-import { OrderResponse } from "@/types/menuOrder.types";
+import {
+  OrderResponse,
+  PaymentStatus,
+  ServiceStatus,
+} from "@/types/menuOrder.types";
 import { CustomerService } from "@/services/customer.service";
 
 type PaymentMethod = "CREDIT CARD" | "QR CODE" | "CASH" | "DIGITAL WALLET";
@@ -170,12 +174,9 @@ export default function PaymentPage({
     if (!activeOrder) return;
     setIsProcessing(true);
     try {
-      // Gọi API cập nhật trạng thái
-      await OrderService.updatePaymentStatus(activeOrder.orderId, "Paid");
       await OrderService.updateServiceStatus(activeOrder.orderId, "Finished");
-
-      alert("Payment successful! Table is now clear.");
-      router.push("/server/tables");
+      await OrderService.updatePaymentStatus(activeOrder.orderId, "Paid");
+      router.push(`/server/tables/${tableId}`);
     } catch (err) {
       console.error("Payment failed", err);
       alert("Payment failed. Please try again.");
@@ -497,10 +498,18 @@ export default function PaymentPage({
           {/* CTA */}
           <button
             onClick={handlePayment}
-            disabled={!activeOrder || isProcessing}
+            disabled={
+              !activeOrder ||
+              isProcessing ||
+              activeOrder.serviceStatus === ServiceStatus.WAITING ||
+              activeOrder.paymentStatus === PaymentStatus.PAID
+            }
             className={`flex items-center justify-center gap-2 w-full duration-500 text-white font-semibold py-3 px-6 rounded-xl transition-colors text-sm
               ${
-                !activeOrder || isProcessing
+                !activeOrder ||
+                isProcessing ||
+                activeOrder.serviceStatus === ServiceStatus.WAITING ||
+                activeOrder.paymentStatus === PaymentStatus.PAID
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-linear-to-r from-irms-green to-irms-green-light hover:from-irms-green-light hover:to-irms-green cursor-pointer"
               }`}
@@ -517,7 +526,7 @@ export default function PaymentPage({
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            {isProcessing ? "PROCESSING..." : "Complete Payment & Clear Table"}
+            {isProcessing ? "PROCESSING..." : "Complete Payment"}
           </button>
           <button
             disabled={!activeOrder}

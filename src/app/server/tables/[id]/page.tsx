@@ -2,7 +2,7 @@
 
 import { Topbar } from "@/components/shared/Topbar";
 import Link from "next/link";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import { UsersRound } from "lucide-react";
 import TableDiagram from "@/components/app/table/TableDiagram";
 import AssignGuestModal from "@/components/app/table/AssignGuestModal";
@@ -94,6 +94,8 @@ export default function TableDetailPage({
 }) {
   const resolvedParams = use(params);
   const tableId = resolvedParams.id;
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   const [tableState, setTableState] = useState<TableState>("empty");
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -106,6 +108,7 @@ export default function TableDetailPage({
   useEffect(() => {
     const checkTableStatus = async () => {
       setIsLoading(true);
+      setGuest(null); // ← reset guest before each fetch so the !guest guard doesn't block
       try {
         const [tableRes, ordersRes] = await Promise.all([
           TableService.getTable(parseInt(tableId)),
@@ -142,32 +145,32 @@ export default function TableDetailPage({
             if (saved) localGuest = JSON.parse(saved);
           } catch (e) {}
 
-          if (!guest) {
-            if (localGuest && !currentActiveOrder) {
-              setGuest(localGuest);
-            } else {
-              const customerDisplay = customerData
-                ? customerData.gender === "Male"
-                  ? `Mr. ${customerData.name}`
-                  : `Ms. ${customerData.name}`
-                : null;
+          // ← removed !guest guard, always set from fresh fetch
+          if (localGuest && !currentActiveOrder) {
+            setGuest(localGuest);
+          } else {
+            const customerDisplay = customerData
+              ? customerData.gender === "Male"
+                ? `Mr. ${customerData.name}`
+                : `Ms. ${customerData.name}`
+              : null;
 
-              setGuest({
-                name:
-                  customerDisplay ||
-                  (currentActiveOrder?.note
-                    ? `Note: ${currentActiveOrder.note}`
-                    : `Guest #${currentActiveOrder?.customerId || "Walk-in"}`),
-                gender: customerData?.gender || "N/A",
-                phone: customerData?.phone || "N/A",
-                partySize: tableData?.currentGuestsNumber || 0,
-                preference: "N/A",
-              });
-            }
+            setGuest({
+              name:
+                customerDisplay ||
+                (currentActiveOrder?.note
+                  ? `Note: ${currentActiveOrder.note}`
+                  : `Guest #${currentActiveOrder?.customerId || "Walk-in"}`),
+              gender: customerData?.gender || "N/A",
+              phone: customerData?.phone || "N/A",
+              partySize: tableData?.currentGuestsNumber || 0,
+              preference: "N/A",
+            });
           }
         } else {
           setActiveOrder(null);
           setTableState("empty");
+          setGuest(null);
         }
       } catch (error) {
         console.error("Failed to check table status:", error);
@@ -177,7 +180,7 @@ export default function TableDetailPage({
     };
 
     checkTableStatus();
-  }, [tableId]); // Only rerun if tableId changes
+  }, [tableId, refreshKey]);
 
   const handleConfirmAssign = async (g: GuestInfo) => {
     try {

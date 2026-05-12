@@ -1,6 +1,21 @@
-export type PaymentStatus = 'Unpaid' | 'Paid';
-export type ServiceStatus = 'Waiting' | 'Eating' | 'Finished';
-export type DishCategory = 'Main_Course' | 'Appetizer' | 'Dessert' | 'Beverage' | 'Side';
+export enum PaymentStatus {
+  UNPAID = 'Unpaid',
+  PAID = 'Paid',
+}
+
+export enum ServiceStatus {
+  WAITING = 'Waiting',
+  EATING = 'Eating',
+  FINISHED = 'Finished',
+}
+
+export enum DishCategory {
+  MAIN_COURSE = 'Main_Course',
+  APPETIZER = 'Appetizer',
+  DESSERT = 'Dessert',
+  BEVERAGE = 'Beverage',
+  SIDE = 'Side',
+}
 
 export interface DishResponse {
   dishId: number;
