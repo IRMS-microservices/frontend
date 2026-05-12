@@ -1,5 +1,5 @@
 import { DishResponse, OrderResponse } from '@/types/menuOrder.types';
-
+/*
 export const MOCK_DISHES: DishResponse[] = [
   { dishId: 1, name: 'Wild Sea Scallops', category: 'Appetizer', basePrice: 42, available: true },
   { dishId: 2, name: 'Heirloom Burrata', category: 'Appetizer', basePrice: 24, available: true },
@@ -14,7 +14,7 @@ export const MOCK_DISHES: DishResponse[] = [
   { dishId: 11, name: 'Valrhona Soufflé', category: 'Dessert', basePrice: 22, available: true },
   { dishId: 12, name: 'Seasonal Sorbet', category: 'Dessert', basePrice: 16, available: true },
 ];
-
+*/
 export const MOCK_TABLES = [
   { id: 1, seats: 4 },
   { id: 2, seats: 4 },
