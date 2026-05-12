@@ -216,10 +216,32 @@ export default function TableDetailPage({
       setGuest(g);
       setTableState("assigned");
       setShowAssignModal(false);
-      window.location.reload();
     } catch (e) {
       console.error("Failed to assign table:", e);
       alert("Failed to assign table. Please try again.");
+    }
+  };
+
+  // Clear table button — replace the inline onClick
+  const handleClearTable = async () => {
+    try {
+      await TableService.updateTableStatus(
+        parseInt(tableId),
+        TableStatus.AVAILABLE,
+      );
+
+      // Refresh table info
+      const tableRes = await TableService.getTable(parseInt(tableId));
+      setTableInfo(tableRes.data);
+
+      localStorage.removeItem(`table_guest_${tableId}`);
+      localStorage.removeItem(`table_cart_${tableId}`);
+
+      setTableState("empty");
+      setGuest(null);
+      setActiveOrder(null);
+    } catch (e) {
+      console.error("Failed to clear table:", e);
     }
   };
 
@@ -360,21 +382,7 @@ export default function TableDetailPage({
                     Create order
                   </Link>
                   <button
-                    onClick={async () => {
-                      try {
-                        await TableService.updateTableStatus(
-                          parseInt(tableId),
-                          TableStatus.AVAILABLE,
-                        );
-                      } catch (e) {
-                        console.error("Failed to update table status", e);
-                      }
-                      localStorage.removeItem(`table_guest_${tableId}`);
-                      localStorage.removeItem(`table_cart_${tableId}`);
-                      setTableState("empty");
-                      setGuest(null);
-                      window.location.reload();
-                    }}
+                    onClick={handleClearTable}
                     className="flex items-center justify-center gap-2 w-full bg-linear-to-r from-gray-300 to-gray-100 cursor-pointer duration-500
                               hover:bg-linear-to-r hover:from-gray-100 hover:to-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-xl transition-colors text-sm"
                   >

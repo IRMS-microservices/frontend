@@ -1,7 +1,7 @@
 "use client";
 
 import { Topbar } from "@/components/shared/Topbar";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { KitchenService } from "@/services/kitchen.service";
 import { OrderService } from "@/services/order.service";
 import {
@@ -10,8 +10,8 @@ import {
   CookingStatus,
   KitchenOrderStatus,
 } from "@/types/kitchen.types";
+import { OrderResponse } from "@/types/menuOrder.types";
 
-/** A ticket = kitchen order enriched with the parent order's tableId */
 interface Ticket {
   kitchenOrderId: number;
   orderId: number;
@@ -25,11 +25,28 @@ export default function ExpeditorViewPage() {
   const [loading, setLoading] = useState(true);
   const [bumpingIds, setBumpingIds] = useState<Set<number>>(new Set());
 
+  // orderId → tableId lookup
+  const orderIdToTableIdRef = useRef<Map<number, number>>(new Map());
+  // orderId → KitchenOrderResponse[] queue (arrived before order)
+  const pendingKitchenOrdersRef = useRef<Map<number, KitchenOrderResponse[]>>(
+    new Map(),
+  );
+
+  const buildTicket = useCallback(
+    (ko: KitchenOrderResponse, tableId: number): Ticket => ({
+      kitchenOrderId: ko.id,
+      orderId: ko.orderId,
+      tableId,
+      fireTime: ko.fireTime,
+      items: ko.items,
+    }),
+    [],
+  );
+
   // Initial load
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch PENDING kitchen orders and Waiting service orders in parallel
       const [kitchenRes, ordersRes] = await Promise.all([
         KitchenService.listOrders(KitchenOrderStatus.PENDING),
         OrderService.getOrders(undefined, "Waiting"),
@@ -38,20 +55,14 @@ export default function ExpeditorViewPage() {
       const kitchenOrders: KitchenOrderResponse[] = kitchenRes.data ?? [];
       const waitingOrders = ordersRes.data ?? [];
 
-      // Build a map orderId → tableId
       const tableMap = new Map<number, number>(
         waitingOrders.map((o) => [o.orderId, o.tableId]),
       );
+      orderIdToTableIdRef.current = tableMap;
 
       const enriched: Ticket[] = kitchenOrders
         .filter((ko) => tableMap.has(ko.orderId))
-        .map((ko) => ({
-          kitchenOrderId: ko.id,
-          orderId: ko.orderId,
-          tableId: tableMap.get(ko.orderId)!,
-          fireTime: ko.fireTime,
-          items: ko.items,
-        }));
+        .map((ko) => buildTicket(ko, tableMap.get(ko.orderId)!));
 
       setTickets(enriched);
     } catch (err) {
@@ -59,16 +70,18 @@ export default function ExpeditorViewPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [buildTicket]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // WebSocket: listen for item status changes
+  // WebSocket listeners
   useEffect(() => {
     KitchenService.connect();
+    OrderService.connect();
 
+    // Item status changed → update item in existing ticket
     const unsubscribeItem = KitchenService.onKitchenOrderItemStatusChanged(
       (updated: KitchenOrderItemResponse) => {
         setTickets((prev) =>
@@ -84,8 +97,8 @@ export default function ExpeditorViewPage() {
       },
     );
 
-    // Optionally remove bumped tickets when their status advances
-    const unsubscribeOrder = KitchenService.onKitchenOrderStatusChanged(
+    // Kitchen order status changed → remove non-pending tickets
+    const unsubscribeKitchenOrder = KitchenService.onKitchenOrderStatusChanged(
       (updatedOrder: KitchenOrderResponse) => {
         if (updatedOrder.status !== KitchenOrderStatus.PENDING) {
           setTickets((prev) =>
@@ -95,12 +108,52 @@ export default function ExpeditorViewPage() {
       },
     );
 
+    // Kitchen order created → add new ticket or queue if tableId unknown
+    const unsubscribeKitchenCreated = KitchenService.onKitchenOrderCreated(
+      (newOrder: KitchenOrderResponse) => {
+        const tableId = orderIdToTableIdRef.current.get(newOrder.orderId);
+
+        if (tableId === undefined) {
+          // Order hasn't arrived yet — queue it
+          const queue =
+            pendingKitchenOrdersRef.current.get(newOrder.orderId) ?? [];
+          queue.push(newOrder);
+          pendingKitchenOrdersRef.current.set(newOrder.orderId, queue);
+          return;
+        }
+
+        setTickets((prev) => [...prev, buildTicket(newOrder, tableId)]);
+      },
+    );
+
+    // Order service status changed → register tableId and flush queue
+    const unsubscribeOrderService = OrderService.onOrderServiceStatusChanged(
+      (order: OrderResponse) => {
+        if (!orderIdToTableIdRef.current.has(order.orderId)) {
+          orderIdToTableIdRef.current.set(order.orderId, order.tableId);
+        }
+
+        // Flush any queued kitchen orders waiting for this orderId
+        const pending = pendingKitchenOrdersRef.current.get(order.orderId);
+        if (pending?.length) {
+          const newTickets = pending.map((ko) =>
+            buildTicket(ko, order.tableId),
+          );
+          setTickets((prev) => [...prev, ...newTickets]); // flush all in one setState
+          pendingKitchenOrdersRef.current.delete(order.orderId);
+        }
+      },
+    );
+
     return () => {
       unsubscribeItem();
-      unsubscribeOrder();
+      unsubscribeKitchenOrder();
+      unsubscribeKitchenCreated();
+      unsubscribeOrderService();
       KitchenService.disconnect();
+      OrderService.disconnect();
     };
-  }, []);
+  }, [buildTicket]);
 
   // Bump ticket
   const handleBump = async (ticket: Ticket) => {
@@ -111,7 +164,6 @@ export default function ExpeditorViewPage() {
         KitchenService.advanceOrderStatus(ticket.kitchenOrderId),
         OrderService.updateServiceStatus(ticket.orderId, "Eating"),
       ]);
-      // Optimistically remove the ticket
       setTickets((prev) =>
         prev.filter((t) => t.kitchenOrderId !== ticket.kitchenOrderId),
       );
@@ -146,7 +198,6 @@ export default function ExpeditorViewPage() {
       <Topbar title="Expeditor View" />
 
       <div className="flex-1 overflow-y-auto p-8">
-        {/* Live overview stats */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-xs font-bold text-irms-text-secondary tracking-widest uppercase mb-1">
@@ -167,7 +218,6 @@ export default function ExpeditorViewPage() {
             onClick={loadData}
             className="flex items-center gap-2 px-4 py-2 border border-irms-border rounded-lg text-sm font-semibold text-irms-text-primary hover:bg-irms-surface transition-colors cursor-pointer"
           >
-            {/* Refresh icon */}
             <svg
               width="14"
               height="14"
@@ -185,7 +235,6 @@ export default function ExpeditorViewPage() {
           </button>
         </div>
 
-        {/* Loading state */}
         {loading ? (
           <div className="flex items-center justify-center h-48 text-irms-text-secondary text-sm">
             Loading tickets…
@@ -209,7 +258,6 @@ export default function ExpeditorViewPage() {
             <span className="text-sm font-medium">No active tickets</span>
           </div>
         ) : (
-          /* Tickets grid */
           <div className="grid grid-cols-4 gap-4 mb-8">
             {tickets.map((ticket) => {
               const ready = canBump(ticket);
@@ -218,11 +266,8 @@ export default function ExpeditorViewPage() {
               return (
                 <div
                   key={ticket.kitchenOrderId}
-                  className={`bg-white rounded-xl border-t-4 overflow-hidden flex flex-col ${
-                    ready ? "border-green-400" : "border-amber-400"
-                  }`}
+                  className={`bg-white rounded-xl border-t-4 overflow-hidden flex flex-col ${ready ? "border-green-400" : "border-amber-400"}`}
                 >
-                  {/* Ticket header */}
                   <div className="p-4 border-b border-irms-border">
                     <div className="flex items-start justify-between mb-1">
                       <span className="text-xl font-bold text-irms-text-primary">
@@ -243,7 +288,6 @@ export default function ExpeditorViewPage() {
                     </div>
                   </div>
 
-                  {/* Items — simplified: name, qty, status */}
                   <div className="p-4 space-y-3 flex-1">
                     {ticket.items.map((item) => {
                       const isReady =
@@ -257,11 +301,7 @@ export default function ExpeditorViewPage() {
                             {item.quantity}× {item.dishName}
                           </span>
                           <span
-                            className={`flex items-center gap-1 text-xs font-semibold whitespace-nowrap ${
-                              isReady
-                                ? "text-green-600"
-                                : "text-irms-text-secondary"
-                            }`}
+                            className={`flex items-center gap-1 text-xs font-semibold whitespace-nowrap ${isReady ? "text-green-600" : "text-irms-text-secondary"}`}
                           >
                             {isReady ? (
                               <svg
@@ -298,16 +338,11 @@ export default function ExpeditorViewPage() {
                     })}
                   </div>
 
-                  {/* Bump button */}
                   <div className="p-4 pt-0">
                     <button
                       disabled={!ready || bumping}
                       onClick={() => handleBump(ticket)}
-                      className={`w-full py-2.5 rounded-lg text-xs font-bold tracking-wider transition-all ${
-                        ready && !bumping
-                          ? "bg-irms-green hover:bg-irms-green/80 text-white cursor-pointer"
-                          : "bg-irms-surface text-irms-text-secondary cursor-not-allowed"
-                      }`}
+                      className={`w-full py-2.5 rounded-lg text-xs font-bold tracking-wider transition-all ${ready && !bumping ? "bg-irms-green hover:bg-irms-green/80 text-white cursor-pointer" : "bg-irms-surface text-irms-text-secondary cursor-not-allowed"}`}
                     >
                       {bumping ? (
                         "BUMPING…"
