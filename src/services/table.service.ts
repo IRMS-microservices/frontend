@@ -1,70 +1,88 @@
 import apiClient from "./apiClient";
 import { ApiResponse } from "@/types/common.types";
-import {
-  TableResponse,
-  TableStatus,
-  AssignTableRequest,
-  UpdateTableStatusRequest,
-} from "@/types/table.types";
 
-/**
- * Helper to wrap raw data into ApiResponse format for consistency with other services.
- */
-const wrapInApiResponse = <T>(data: T): ApiResponse<T> => ({
-  data,
-  success: true,
-  message: "Success",
-  timestamp: new Date().toISOString(),
-});
+export type TableStatus = 'AVAILABLE' | 'OCCUPIED';
+
+export interface TableResponse {
+  id: string;
+  tableNumber: number | string;
+  status: TableStatus;
+  capacity: number;
+}
+
+export interface CreateTableRequest {
+  tableNumber: number | string;
+  capacity: number;
+  status?: TableStatus;
+}
+
+export interface UpdateTableRequest {
+  tableNumber?: number | string;
+  capacity?: number;
+  status?: TableStatus;
+}
+
+export interface TableQuery {
+  tableNumber?: number | string;
+  status?: TableStatus;
+  minCapacity?: number;
+  maxCapacity?: number;
+  page?: number;
+  limit?: number;
+}
 
 export const TableService = {
   /**
-   * Get all tables
+   * GET /api/tables
+   * Query floor table status (SERVER, ADMIN).
+   * Supports: tableNumber, status, minCapacity, maxCapacity, page, limit
    */
-  getTables: async (
-    status?: TableStatus,
-  ): Promise<ApiResponse<TableResponse[]>> => {
-    const params = { status };
-    const response = await apiClient.get<TableResponse[]>("/tables", {
-      params,
+  getTables: async (query?: TableQuery): Promise<ApiResponse<TableResponse[]>> => {
+    const response = await apiClient.get<ApiResponse<TableResponse[]>>("/api/tables", {
+      params: query,
     });
-    return wrapInApiResponse(response.data);
+    return response.data;
   },
 
   /**
-   * Get table details
+   * GET /api/tables/{id}
+   * Get a single table by ID (SERVER, ADMIN).
    */
-  getTable: async (tableId: number): Promise<ApiResponse<TableResponse>> => {
-    const response = await apiClient.get<TableResponse>(`/tables/${tableId}`);
-    return wrapInApiResponse(response.data);
+  getTable: async (tableId: string): Promise<ApiResponse<TableResponse>> => {
+    const response = await apiClient.get<ApiResponse<TableResponse>>(`/api/tables/${tableId}`);
+    return response.data;
   },
 
   /**
-   * Assign customers to a table
+   * POST /api/tables
+   * Register a new table (SERVER, ADMIN).
    */
-  assignTable: async (
-    tableId: number,
-    request: AssignTableRequest,
+  createTable: async (request: CreateTableRequest): Promise<ApiResponse<TableResponse>> => {
+    const response = await apiClient.post<ApiResponse<TableResponse>>("/api/tables", request);
+    return response.data;
+  },
+
+  /**
+   * PUT /api/tables/{id}
+   * Update a table's details or status (SERVER, ADMIN).
+   */
+  updateTable: async (
+    tableId: string,
+    request: UpdateTableRequest
   ): Promise<ApiResponse<TableResponse>> => {
-    const response = await apiClient.post<TableResponse>(
-      `/tables/${tableId}/assign`,
-      request,
+    const response = await apiClient.put<ApiResponse<TableResponse>>(
+      `/api/tables/${tableId}`,
+      request
     );
-    return wrapInApiResponse(response.data);
+    return response.data;
   },
 
   /**
-   * Update table status
+   * DELETE /api/tables/{id}
+   * Remove a table (SERVER, ADMIN).
    */
-  updateTableStatus: async (
-    tableId: number,
-    status: TableStatus,
-  ): Promise<ApiResponse<TableResponse>> => {
-    const request: UpdateTableStatusRequest = { status };
-    const response = await apiClient.patch<TableResponse>(
-      `/tables/${tableId}/status`,
-      request,
-    );
-    return wrapInApiResponse(response.data);
+  deleteTable: async (tableId: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/api/tables/${tableId}`);
+    return response.data;
   },
 };

@@ -2,41 +2,59 @@ import apiClient from './apiClient';
 import { ApiResponse } from '../types/common.types';
 import { CustomerRequest, CustomerResponse } from '@/types/customer.types';
 
+export interface CustomerQuery {
+  name?: string;
+  phoneNumber?: string;
+  gender?: 'MALE' | 'FEMALE';
+  page?: number;
+  limit?: number;
+}
+
 export const CustomerService = {
   /**
-   * Get all customers
+   * GET /api/customers
+   * Query customer records (ADMIN, SERVER).
+   * Supports: name, phoneNumber, gender, page, limit
    */
-  getAllCustomers: async (): Promise<ApiResponse<CustomerResponse[]>> => {
-    const response = await apiClient.get<ApiResponse<CustomerResponse[]>>('/customers');
-    return response.data;
-  },
-
-  getCustomerById: async (id: number): Promise<ApiResponse<CustomerResponse>> => {
-    const response = await apiClient.get<ApiResponse<CustomerResponse>>(`/customers/${id}`);
+  getAllCustomers: async (query?: CustomerQuery): Promise<ApiResponse<CustomerResponse[]>> => {
+    const response = await apiClient.get<ApiResponse<CustomerResponse[]>>('/api/customers', { params: query });
     return response.data;
   },
 
   /**
-   * Create a customer
+   * GET /api/customers/{id}
+   * Get customer details (ADMIN, SERVER).
+   */
+  getCustomerById: async (id: string): Promise<ApiResponse<CustomerResponse>> => {
+    const response = await apiClient.get<ApiResponse<CustomerResponse>>(`/api/customers/${id}`);
+    return response.data;
+  },
+
+  /**
+   * POST /api/customers
+   * Create a customer profile (ADMIN, SERVER).
+   * Body: { name, phoneNumber, gender }
    */
   createCustomer: async (request: CustomerRequest): Promise<ApiResponse<CustomerResponse>> => {
-    const response = await apiClient.post<ApiResponse<CustomerResponse>>('/customers', request);
+    const response = await apiClient.post<ApiResponse<CustomerResponse>>('/api/customers', request);
     return response.data;
   },
 
   /**
-   * Update a customer
+   * PUT /api/customers/{id}
+   * Update a customer profile (ADMIN, SERVER).
    */
-  updateCustomer: async (id: number, request: CustomerRequest): Promise<ApiResponse<CustomerResponse>> => {
-    const response = await apiClient.put<ApiResponse<CustomerResponse>>(`/customers/${id}`, request);
+  updateCustomer: async (id: string, request: CustomerRequest): Promise<ApiResponse<CustomerResponse>> => {
+    const response = await apiClient.put<ApiResponse<CustomerResponse>>(`/api/customers/${id}`, request);
     return response.data;
   },
 
   /**
-   * Delete a customer
+   * DELETE /api/customers/{id}
+   * Delete a customer profile (ADMIN only).
    */
-  deleteCustomer: async (id: number): Promise<ApiResponse<void>> => {
-    const response = await apiClient.delete<ApiResponse<void>>(`/customers/${id}`);
+  deleteCustomer: async (id: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/api/customers/${id}`);
     return response.data;
-  }
+  },
 };

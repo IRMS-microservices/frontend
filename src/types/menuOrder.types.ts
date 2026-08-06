@@ -1,20 +1,20 @@
 export enum PaymentStatus {
-  UNPAID = 'Unpaid',
-  PAID = 'Paid',
+  UNPAID = 'UNPAID',
+  PAID = 'PAID',
 }
 
 export enum ServiceStatus {
-  WAITING = 'Waiting',
-  EATING = 'Eating',
-  FINISHED = 'Finished',
+  WAITING = 'WAITING',
+  EATING = 'EATING',
+  FINISHED = 'FINISHED',
 }
 
 export enum DishCategory {
-  MAIN_COURSE = 'Main_Course',
-  APPETIZER = 'Appetizer',
-  DESSERT = 'Dessert',
-  BEVERAGE = 'Beverage',
-  SIDE = 'Side',
+  MAIN_COURSE = 'MAIN_COURSE',
+  APPETIZER = 'APPETIZER',
+  DESSERT = 'DESSERT',
+  BEVERAGE = 'BEVERAGE',
+  SIDE = 'SIDE',
 }
 
 export interface DishResponse {

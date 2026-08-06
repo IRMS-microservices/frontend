@@ -10,7 +10,6 @@ import {
   CookingStatus,
   KitchenOrderStatus,
 } from "@/types/kitchen.types";
-import { OrderResponse } from "@/types/menuOrder.types";
 
 interface Ticket {
   kitchenOrderId: number;
@@ -27,10 +26,6 @@ export default function ExpeditorViewPage() {
 
   // orderId → tableId lookup
   const orderIdToTableIdRef = useRef<Map<number, number>>(new Map());
-  // orderId → KitchenOrderResponse[] queue (arrived before order)
-  const pendingKitchenOrdersRef = useRef<Map<number, KitchenOrderResponse[]>>(
-    new Map(),
-  );
 
   const buildTicket = useCallback(
     (ko: KitchenOrderResponse, tableId: number): Ticket => ({
@@ -48,8 +43,8 @@ export default function ExpeditorViewPage() {
     try {
       setLoading(true);
       const [kitchenRes, ordersRes] = await Promise.all([
-        KitchenService.listOrders(KitchenOrderStatus.PENDING),
-        OrderService.getOrders(undefined, "Waiting"),
+        KitchenService.listOrders({ status: KitchenOrderStatus.PENDING }),
+        OrderService.getOrders({ serviceStatus: "PENDING" }),
       ]);
 
       const kitchenOrders: KitchenOrderResponse[] = kitchenRes.data ?? [];
@@ -78,80 +73,64 @@ export default function ExpeditorViewPage() {
 
   // WebSocket listeners
   useEffect(() => {
-    KitchenService.connect();
-    OrderService.connect();
+    const socket = KitchenService.connect();
 
-    // Item status changed → update item in existing ticket
-    const unsubscribeItem = KitchenService.onKitchenOrderItemStatusChanged(
-      (updated: KitchenOrderItemResponse) => {
-        setTickets((prev) =>
-          prev.map((ticket) => ({
-            ...ticket,
-            items: ticket.items.map((item) =>
-              item.id === updated.id
-                ? { ...item, cookingStatus: updated.cookingStatus }
-                : item,
-            ),
-          })),
-        );
-      },
-    );
+    socket.on("connect", () => {
+      KitchenService.joinRoom("expeditor");
+    });
+    // Also try immediately in case already connected
+    if (socket.connected) {
+      KitchenService.joinRoom("expeditor");
+    }
 
-    // Kitchen order status changed → remove non-pending tickets
-    const unsubscribeKitchenOrder = KitchenService.onKitchenOrderStatusChanged(
-      (updatedOrder: KitchenOrderResponse) => {
-        if (updatedOrder.status !== KitchenOrderStatus.PENDING) {
-          setTickets((prev) =>
-            prev.filter((t) => t.kitchenOrderId !== updatedOrder.id),
-          );
-        }
-      },
-    );
-
-    // Kitchen order created → add new ticket or queue if tableId unknown
-    const unsubscribeKitchenCreated = KitchenService.onKitchenOrderCreated(
-      (newOrder: KitchenOrderResponse) => {
-        const tableId = orderIdToTableIdRef.current.get(newOrder.orderId);
+    // Kitchen order created → add new ticket or fetch tableId if unknown
+    const unsubscribeKitchenCreated = KitchenService.onOrderCreated(
+      async (newOrder: KitchenOrderResponse) => {
+        let tableId = orderIdToTableIdRef.current.get(newOrder.orderId);
 
         if (tableId === undefined) {
-          // Order hasn't arrived yet — queue it
-          const queue =
-            pendingKitchenOrdersRef.current.get(newOrder.orderId) ?? [];
-          queue.push(newOrder);
-          pendingKitchenOrdersRef.current.set(newOrder.orderId, queue);
-          return;
+          try {
+            const res = await OrderService.getOrderById(String(newOrder.orderId));
+            if (res.data) {
+              tableId = Number(res.data.tableId);
+              orderIdToTableIdRef.current.set(newOrder.orderId, tableId);
+            }
+          } catch (err) {
+            console.error("Failed to fetch order for new kitchen order:", err);
+          }
         }
 
-        setTickets((prev) => [...prev, buildTicket(newOrder, tableId)]);
+        if (tableId !== undefined) {
+          setTickets((prev) => [...prev, buildTicket(newOrder, tableId!)]);
+        }
       },
     );
 
-    // Order service status changed → register tableId and flush queue
-    const unsubscribeOrderService = OrderService.onOrderServiceStatusChanged(
-      (order: OrderResponse) => {
-        if (!orderIdToTableIdRef.current.has(order.orderId)) {
-          orderIdToTableIdRef.current.set(order.orderId, order.tableId);
-        }
-
-        // Flush any queued kitchen orders waiting for this orderId
-        const pending = pendingKitchenOrdersRef.current.get(order.orderId);
-        if (pending?.length) {
-          const newTickets = pending.map((ko) =>
-            buildTicket(ko, order.tableId),
-          );
-          setTickets((prev) => [...prev, ...newTickets]); // flush all in one setState
-          pendingKitchenOrdersRef.current.delete(order.orderId);
-        }
-      },
+    // Kitchen order item completed
+    const unsubscribeItemCompleted = KitchenService.onItemCompleted(
+      (completedItem: any) => {
+        setTickets((prev) =>
+          prev.map((ticket) => {
+            if (completedItem.orderId && String(ticket.orderId) !== String(completedItem.orderId)) {
+              return ticket;
+            }
+            return {
+              ...ticket,
+              items: ticket.items.map((item) =>
+                String(item.id) === String(completedItem._id || completedItem.id)
+                  ? { ...item, cookingStatus: CookingStatus.COMPLETED }
+                  : item
+              ),
+            };
+          })
+        );
+      }
     );
 
     return () => {
-      unsubscribeItem();
-      unsubscribeKitchenOrder();
       unsubscribeKitchenCreated();
-      unsubscribeOrderService();
+      unsubscribeItemCompleted();
       KitchenService.disconnect();
-      OrderService.disconnect();
     };
   }, [buildTicket]);
 
@@ -161,8 +140,8 @@ export default function ExpeditorViewPage() {
     setBumpingIds((prev) => new Set(prev).add(ticket.kitchenOrderId));
     try {
       await Promise.all([
-        KitchenService.advanceOrderStatus(ticket.kitchenOrderId),
-        OrderService.updateServiceStatus(ticket.orderId, "Eating"),
+        KitchenService.updateOrder(String(ticket.kitchenOrderId), { status: "COMPLETED" }),
+        OrderService.updateOrder(String(ticket.orderId), { serviceStatus: "CONFIRMED" }),
       ]);
       setTickets((prev) =>
         prev.filter((t) => t.kitchenOrderId !== ticket.kitchenOrderId),
@@ -186,10 +165,8 @@ export default function ExpeditorViewPage() {
     switch (status) {
       case CookingStatus.COMPLETED:
         return "Ready";
-      case CookingStatus.IN_PROGRESS:
-        return "Cooking…";
       default:
-        return status;
+        return "Cooking...";
     }
   };
 

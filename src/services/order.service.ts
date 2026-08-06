@@ -1,97 +1,80 @@
 import apiClient from './apiClient';
 import { CreateOrderRequest, OrderResponse } from '../types/menuOrder.types';
-import { ApiResponse, SocketEvent } from '@/types/common.types';
-import { io, Socket } from 'socket.io-client';
+import { ApiResponse } from '@/types/common.types';
 
-const SOCKET_URL =
-  process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:8099';
+export interface OrderQuery {
+  page?: number;
+  limit?: number;
+  tableId?: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  paymentStatus?: string;
+  serviceStatus?: string;
+  createdBy?: string;
+  note?: string;
+  startDate?: string;
+  endDate?: string;
+}
 
-let socket: Socket | null = null;
-
-function getSocket(): Socket {
-  if (!socket || !socket.connected) {
-    const token = sessionStorage.getItem("token");
-    socket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      autoConnect: true,
-      query: {
-        token: token
-      }
-    });
-  }
-  return socket;
+export interface UpdateOrderRequest {
+  tableId?: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  paymentStatus?: 'PENDING' | 'PAID' | 'CANCELLED';
+  serviceStatus?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  note?: string;
 }
 
 export const OrderService = {
   /**
-   * Tạo đơn hàng mới cho khách (Gửi event sang nhà bếp)
+   * POST /api/orders
+   * Create a dining order (SERVER, ADMIN).
    */
   createOrder: async (request: CreateOrderRequest): Promise<ApiResponse<OrderResponse>> => {
-    const response = await apiClient.post('/orders', request);
+    const response = await apiClient.post('/api/orders', request);
     return response.data;
   },
 
   /**
-   * Lấy danh sách các đơn hàng theo bàn hoặc trạng thái
+   * GET /api/orders
+   * List orders with filters (SERVER, ADMIN).
+   * Supports: page, limit, tableId, customerId, customerName, customerPhone,
+   *           paymentStatus, serviceStatus, createdBy, note, startDate, endDate
    */
-  getOrders: async (tableId?: number, serviceStatus?: string, paymentStatus?: string): Promise<ApiResponse<OrderResponse[]>> => {
-    const params = { tableId, serviceStatus, paymentStatus };
-    const response = await apiClient.get('/orders', { params });
+  getOrders: async (query?: OrderQuery): Promise<ApiResponse<OrderResponse[]>> => {
+    const response = await apiClient.get('/api/orders', { params: query });
     return response.data;
   },
 
   /**
-   * Lấy chi tiết đơn hàng
+   * GET /api/orders/{id}
+   * Get order details.
    */
-  getOrderById: async (orderId: number): Promise<ApiResponse<OrderResponse>> => {
-    const response = await apiClient.get(`/orders/${orderId}`);
+  getOrderById: async (orderId: string): Promise<ApiResponse<OrderResponse>> => {
+    const response = await apiClient.get(`/api/orders/${orderId}`);
     return response.data;
   },
 
   /**
-   * Cập nhật trạng thái phục vụ (Waiting -> Eating -> Finished)
+   * PUT /api/orders/{id}
+   * Update an order (e.g. status, paymentStatus, serviceStatus).
    */
-  updateServiceStatus: async (orderId: number, serviceStatus: string): Promise<ApiResponse<OrderResponse>> => {
-    const response = await apiClient.patch(`/orders/${orderId}/status`, { serviceStatus });
+  updateOrder: async (
+    orderId: string,
+    body: UpdateOrderRequest
+  ): Promise<ApiResponse<OrderResponse>> => {
+    const response = await apiClient.put(`/api/orders/${orderId}`, body);
     return response.data;
   },
 
   /**
-   * Đánh dấu đã thanh toán
+   * DELETE /api/orders/{id}
+   * Delete an order.
    */
-  updatePaymentStatus: async (orderId: number, paymentStatus: string): Promise<ApiResponse<OrderResponse>> => {
-    const response = await apiClient.patch(`/orders/${orderId}/payment`, { paymentStatus });
+  deleteOrder: async (orderId: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete(`/api/orders/${orderId}`);
     return response.data;
-  },
-
-  /**
-       * Connect to the SocketIO server.
-       * Call once when the kitchen page mounts.
-       */
-  connect(): Socket {
-    return getSocket();
-  },
-
-  /**
-   * Disconnect and destroy the SocketIO socket.
-   * Call when the kitchen page unmounts.
-   */
-  disconnect(): void {
-    if (socket) {
-      socket.disconnect();
-      socket = null;
-    }
-  },
-
-  /**
-     * Subscribe to ORDER_SERVICE_STATUS_CHANGED events.
-     * Emitted by the backend whenever a Order status changes.
-     */
-  onOrderServiceStatusChanged(
-    callback: (order: OrderResponse) => void
-  ): () => void {
-    const s = getSocket();
-    s.on(SocketEvent.ORDER_SERVICE_STATUS_CHANGED, callback);
-    return () => s.off(SocketEvent.ORDER_SERVICE_STATUS_CHANGED, callback);
   },
 };

@@ -3,39 +3,27 @@
 import { Topbar } from "@/components/shared/Topbar";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { KitchenService } from "@/services/kitchen.service";
-import { OrderService } from "@/services/order.service";
 import {
   KitchenOrderResponse,
-  KitchenOrderStatus,
 } from "@/types/kitchen.types";
-import { OrderResponse } from "@/types/menuOrder.types";
 import useElapsed from "@/hooks/useElapsed";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** One row inside a ticket: which table ordered this dish and how many */
-interface TicketRow {
-  tableId: number;
-  kitchenOrderItemId: number;
-  quantity: number;
-}
-
 /**
- * A ticket groups the same dish ordered within a 3-minute window.
- * Key format: "<dishName>-<groupFireTimeMs>"
+ * A ticket as received from the backend via 'ticket:update'.
+ * Each ticket represents one grouped dish across tables.
+ * The backend sends the already-grouped array — no client-side grouping needed.
  */
 interface Ticket {
-  key: string;
+  key: string;          // unique key derived from the order for React
   dishName: string;
-  /** fireTime (ms) of the very first item in this group – used for timing */
   groupFireTimeMs: number;
-  rows: TicketRow[];
+  rows: { tableId: string | number; kitchenItemId: string; quantity: number }[];
   totalQty: number;
-  /** Station label derived from item data (optional – filters against STATIONS) */
   station?: string;
-  /** true if any item has been bumped (all advanceItemStatus calls succeeded) */
   bumped: boolean;
 }
 
@@ -50,72 +38,55 @@ const STATIONS: Station[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Helper: build / append to the ticket map
+// Helper: map KitchenOrderResponse[] (from initial REST load) into Ticket[]
+// The server socket sends already-grouped data, but the REST endpoint returns
+// raw kitchen orders — we flatten items into a ticket per dish+order.
 // ---------------------------------------------------------------------------
 
-const THREE_MINUTES_MS = 3 * 60 * 1000;
-
-// parse firetime Instant -> ISO
 function parseFireTime(fireTime: any): number {
   if (!fireTime) return Date.now();
-
   if (typeof fireTime === "object" && "epochSecond" in fireTime) {
     return fireTime.epochSecond * 1000 + Math.floor(fireTime.nano / 1_000_000);
   }
-
-  if (typeof fireTime === "string") {
-    return new Date(fireTime).getTime();
-  }
-
+  if (typeof fireTime === "string") return new Date(fireTime).getTime();
   if (typeof fireTime === "number") {
-    return fireTime < 1_000_000_000_000
-      ? Math.floor(fireTime * 1000)
-      : fireTime;
+    return fireTime < 1_000_000_000_000 ? Math.floor(fireTime * 1000) : fireTime;
   }
-
   return Date.now();
 }
 
-/**
- * Given the current map and a new KitchenOrderResponse + orderId→tableId lookup,
- * append every item from that order into the map following the grouping rules.
- * Returns the *new* map (does not mutate the input).
- */
-function appendOrderToMap(
-  map: Map<string, Ticket>,
-  order: KitchenOrderResponse,
-  orderIdToTableId: Map<number, number>,
-): void {
-  const tableId = orderIdToTableId.get(order.orderId) ?? 0;
-  console.log("Order firetime from socket: ", order.fireTime);
-  const orderFireMs = parseFireTime(order.fireTime);
-  const bucketMs =
-    Math.floor(orderFireMs / THREE_MINUTES_MS) * THREE_MINUTES_MS;
-
-  for (const item of order.items) {
-    const key = `${item.dishName}-${bucketMs}`;
-    const existing = map.get(key);
-
-    if (existing && !existing.bumped) {
-      existing.rows.push({
-        tableId,
-        kitchenOrderItemId: item.id,
-        quantity: item.quantity,
-      });
-      existing.totalQty += item.quantity;
-    } else {
-      map.set(key, {
-        key,
+function ordersToTickets(orders: KitchenOrderResponse[]): Ticket[] {
+  const tickets: Ticket[] = [];
+  for (const order of orders) {
+    const fireMs = parseFireTime(order.fireTime);
+    for (const item of order.items) {
+      tickets.push({
+        key: `${order.id}-${item.id}`,
         dishName: item.dishName,
-        groupFireTimeMs: orderFireMs,
-        rows: [
-          { tableId, kitchenOrderItemId: item.id, quantity: item.quantity },
-        ],
+        groupFireTimeMs: fireMs,
+        rows: [{ tableId: order.orderId, kitchenItemId: String(item.id), quantity: item.quantity }],
         totalQty: item.quantity,
         bumped: false,
       });
     }
   }
+  return tickets;
+}
+
+/**
+ * Merge a newly received ticket:update array into the existing local state.
+ * If a ticket key already exists (and hasn't been bumped), overwrite it;
+ * if it's new, append it.
+ */
+function mergeTickets(prev: Ticket[], incoming: KitchenOrderResponse[]): Ticket[] {
+  const incomingTickets = ordersToTickets(incoming);
+  const map = new Map(prev.map((t) => [t.key, t]));
+  for (const t of incomingTickets) {
+    if (!map.get(t.key)?.bumped) {
+      map.set(t.key, t);
+    }
+  }
+  return Array.from(map.values());
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +101,7 @@ function TicketCard({
   onBump: (ticket: Ticket) => void;
 }) {
   const timer = useElapsed(ticket.groupFireTimeMs);
-  const [mm, ss] = timer.split(":").map(Number);
+  const [mm] = timer.split(":").map(Number);
   const isOverdue = mm >= 10;
 
   return (
@@ -153,11 +124,11 @@ function TicketCard({
       <div className="space-y-2 mb-4 mt-3">
         {ticket.rows.map((row) => (
           <div
-            key={`${row.tableId}-${row.kitchenOrderItemId}`}
+            key={`${row.tableId}-${row.kitchenItemId}`}
             className="flex items-center justify-between bg-[#f9fafb] rounded-lg px-3 py-1.5"
           >
             <span className="text-sm font-semibold text-[#374151]">
-              Table {String(row.tableId).padStart(2, "0")}
+              Order #{String(row.tableId).padStart(2, "0")}
             </span>
             <span className="text-sm font-semibold text-[#374151]">
               ×{row.quantity}
@@ -200,7 +171,7 @@ function TicketCard({
 }
 
 // ---------------------------------------------------------------------------
-// Longest-wait chip – needs live timer, so it's its own tiny component
+// Longest-wait chip
 // ---------------------------------------------------------------------------
 
 function LongestWaitChip({ startMs }: { startMs: number }) {
@@ -238,61 +209,28 @@ function LongestWaitChip({ startMs }: { startMs: number }) {
 // ---------------------------------------------------------------------------
 
 export default function ChefViewPage() {
-  const pendingOrdersRef = useRef<Map<number, KitchenOrderResponse[]>>(
-    new Map(),
-  );
   const [activeStation, setActiveStation] = useState<Station>("ALL STATIONS");
-  const [ticketMap, setTicketMap] = useState<Map<string, Ticket>>(new Map());
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [bumpingKeys, setBumpingKeys] = useState<Set<string>>(new Set());
 
-  // Keep a ref so the WS callback can always see the latest map + lookup
-  const ticketMapRef = useRef(ticketMap);
-  const orderIdToTableIdRef = useRef<Map<number, number>>(new Map());
-
-  useEffect(() => {
-    ticketMapRef.current = ticketMap;
-  }, [ticketMap]);
-
   // ---------------------------------------------------------------------------
-  // Initial load
+  // Initial REST load
   // ---------------------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
-        const [kitchenRes, orderRes] = await Promise.all([
-          KitchenService.listOrders(KitchenOrderStatus.PENDING),
-          OrderService.getOrders(undefined, "Waiting"),
-        ]);
-
+        const res = await KitchenService.listOrders({ status: "PENDING" });
         if (cancelled) return;
-
-        // Build orderId → tableId lookup from Waiting orders
-        const lookup = new Map<number, number>();
-        if (orderRes.data) {
-          for (const o of orderRes.data) {
-            lookup.set(o.orderId, o.tableId);
-          }
-        }
-        orderIdToTableIdRef.current = lookup;
-
-        // Sort by fireTime ascending
-        const sorted = (kitchenRes.data ?? [])
+        const sorted = (res.data ?? [])
           .slice()
           .sort(
             (a, b) =>
               new Date(a.fireTime).getTime() - new Date(b.fireTime).getTime(),
           );
-
-        // Build ticket map
-        const map = new Map<string, Ticket>();
-        for (const order of sorted) {
-          appendOrderToMap(map, order, lookup);
-        }
-
-        setTicketMap(map);
+        setTickets(ordersToTickets(sorted));
       } catch (err) {
         console.error("Failed to load kitchen orders", err);
       } finally {
@@ -301,80 +239,52 @@ export default function ChefViewPage() {
     }
 
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   // ---------------------------------------------------------------------------
-  // WebSocket – listen for newly created kitchen orders
+  // WebSocket – listen for 'ticket:update' (already grouped by the server)
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    const unsubscribeKitchen = KitchenService.onKitchenOrderCreated(
-      (newOrder: KitchenOrderResponse) => {
-        if (!orderIdToTableIdRef.current.has(newOrder.orderId)) {
-          // tableId not yet known — queue it
-          const queue = pendingOrdersRef.current.get(newOrder.orderId) ?? [];
-          queue.push(newOrder);
-          pendingOrdersRef.current.set(newOrder.orderId, queue);
-          return;
-        }
+    const socket = KitchenService.connect();
 
-        setTicketMap((prev) => {
-          const map = new Map(prev);
-          appendOrderToMap(map, newOrder, orderIdToTableIdRef.current);
-          return map;
-        });
+    // Join the chef room so we receive ticket:update events
+    socket.on("connect", () => {
+      KitchenService.joinRoom("chef");
+    });
+    // Also try immediately in case already connected
+    if (socket.connected) {
+      KitchenService.joinRoom("chef");
+    }
+
+    const unsubscribe = KitchenService.onTicketUpdate(
+      (incoming: KitchenOrderResponse[]) => {
+        setTickets((prev) => mergeTickets(prev, incoming));
       },
     );
-
-    const unsubscribeOrder = OrderService.onOrderServiceStatusChanged(
-      (order: OrderResponse) => {
-        if (!orderIdToTableIdRef.current.has(order.orderId)) {
-          orderIdToTableIdRef.current.set(order.orderId, order.tableId);
-
-          // Flush any queued kitchen orders that were waiting for this orderId
-          const pending = pendingOrdersRef.current.get(order.orderId);
-          if (pending?.length) {
-            setTicketMap((prev) => {
-              const map = new Map(prev);
-              for (const queued of pending) {
-                appendOrderToMap(map, queued, orderIdToTableIdRef.current);
-              }
-              return map;
-            });
-            pendingOrdersRef.current.delete(order.orderId); // cleanup after flush
-          }
-        }
-      },
-    );
-
-    KitchenService.connect();
-    OrderService.connect();
 
     return () => {
-      unsubscribeKitchen();
-      unsubscribeOrder();
+      unsubscribe();
       KitchenService.disconnect();
-      OrderService.disconnect();
     };
   }, []);
 
-  // Bump handler
+  // ---------------------------------------------------------------------------
+  // Bump handler — mark item as COMPLETED
+  // ---------------------------------------------------------------------------
   const handleBump = useCallback(async (ticket: Ticket) => {
     setBumpingKeys((prev) => new Set(prev).add(ticket.key));
     try {
       await Promise.all(
         ticket.rows.map((row) =>
-          KitchenService.advanceItemStatus(row.kitchenOrderItemId),
+          KitchenService.updateOrderItem(row.kitchenItemId, {
+            cookingStatus: "COMPLETED",
+          }),
         ),
       );
-      setTicketMap((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(ticket.key);
-        if (existing) next.set(ticket.key, { ...existing, bumped: true });
-        return next;
-      });
+      setTickets((prev) =>
+        prev.map((t) => (t.key === ticket.key ? { ...t, bumped: true } : t)),
+      );
     } catch (err) {
       console.error("Bump failed", err);
     } finally {
@@ -387,7 +297,7 @@ export default function ChefViewPage() {
   }, []);
 
   // Derived data
-  const activeTickets = Array.from(ticketMap.values()).filter((t) => {
+  const activeTickets = tickets.filter((t) => {
     if (t.bumped) return false;
     if (activeStation === "ALL STATIONS") return true;
     return t.station?.toUpperCase().includes(activeStation) ?? false;
@@ -395,10 +305,7 @@ export default function ChefViewPage() {
 
   const totalItems = activeTickets.reduce((sum, t) => sum + t.totalQty, 0);
 
-  // Longest wait is based on ALL non-bumped tickets, not just the filtered view
-  const allActiveTickets = Array.from(ticketMap.values()).filter(
-    (t) => !t.bumped,
-  );
+  const allActiveTickets = tickets.filter((t) => !t.bumped);
   const earliestFireMs =
     allActiveTickets.length > 0
       ? Math.min(...allActiveTickets.map((t) => t.groupFireTimeMs))
@@ -453,19 +360,13 @@ export default function ChefViewPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {activeTickets
-              .filter((t) =>
-                activeStation === "ALL STATIONS"
-                  ? true
-                  : t.station === activeStation,
-              )
-              .map((ticket) => (
-                <TicketCard
-                  key={ticket.key}
-                  ticket={ticket}
-                  onBump={bumpingKeys.has(ticket.key) ? () => {} : handleBump}
-                />
-              ))}
+            {activeTickets.map((ticket) => (
+              <TicketCard
+                key={ticket.key}
+                ticket={ticket}
+                onBump={bumpingKeys.has(ticket.key) ? () => {} : handleBump}
+              />
+            ))}
           </div>
         )}
       </div>

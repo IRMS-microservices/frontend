@@ -2,48 +2,79 @@ import apiClient from './apiClient';
 import { ApiResponse } from '../types/common.types';
 
 export interface UserResponse {
-  id: number;
+  id: string;
   username: string;
-  full_name: string;
-  phone_number: string;
+  fullName: string;
+  phoneNumber: string;
   role: string;
 }
 
+export interface CreateUserRequest {
+  fullName: string;
+  role: 'SERVER' | 'ADMIN' | 'KITCHEN';
+  phoneNumber: string;
+  username: string;
+  password: string;
+}
+
 export interface UpdateUserRequest {
-  full_name?: string;
-  phone_number?: string;
-  role?: string;
+  fullName?: string;
+  phoneNumber?: string;
+  role?: 'SERVER' | 'ADMIN' | 'KITCHEN';
   password?: string;
+}
+
+export interface UserListQuery {
+  role?: 'SERVER' | 'ADMIN' | 'KITCHEN';
+  search?: string;
+  page?: number;
+  limit?: number;
 }
 
 export const UserService = {
   /**
-   * Get all users
+   * GET /api/users/profile
+   * Fetch the current authenticated user's profile.
    */
-  getAllUsers: async (): Promise<ApiResponse<UserResponse[]>> => {
-    // Controller is mapped to /api/v1/users, and apiClient baseURL is /api
-    const response = await apiClient.get<ApiResponse<UserResponse[]>>('/users');
-    return response.data;
-  },
-
-  getUserById: async (id: number): Promise<ApiResponse<UserResponse>> => {
-    const response = await apiClient.get<ApiResponse<UserResponse>>(`/users/${id}`);
+  getProfile: async (): Promise<ApiResponse<UserResponse>> => {
+    const response = await apiClient.get<ApiResponse<UserResponse>>('/api/users/profile');
     return response.data;
   },
 
   /**
-   * Update a user
+   * GET /api/users/list
+   * List staff users (ADMIN only).
+   * Supports: role, search, page, limit
    */
-  updateUser: async (id: number, request: UpdateUserRequest): Promise<ApiResponse<UserResponse>> => {
-    const response = await apiClient.put<ApiResponse<UserResponse>>(`/users/${id}`, request);
+  listUsers: async (query?: UserListQuery): Promise<ApiResponse<UserResponse[]>> => {
+    const response = await apiClient.get<ApiResponse<UserResponse[]>>('/api/users/list', { params: query });
     return response.data;
   },
 
   /**
-   * Delete a user
+   * POST /api/users/create
+   * Create a new user (ADMIN only).
    */
-  deleteUser: async (id: number): Promise<ApiResponse<void>> => {
-    const response = await apiClient.delete<ApiResponse<void>>(`/users/${id}`);
+  createUser: async (request: CreateUserRequest): Promise<ApiResponse<UserResponse>> => {
+    const response = await apiClient.post<ApiResponse<UserResponse>>('/api/users/create', request);
     return response.data;
-  }
+  },
+
+  /**
+   * PUT /api/users/update/{id}
+   * Update user fields: fullName, role, phoneNumber, password (ADMIN only).
+   */
+  updateUser: async (id: string, request: UpdateUserRequest): Promise<ApiResponse<UserResponse>> => {
+    const response = await apiClient.put<ApiResponse<UserResponse>>(`/api/users/update/${id}`, request);
+    return response.data;
+  },
+
+  /**
+   * DELETE /api/users/delete/{id}
+   * Remove a user (ADMIN only).
+   */
+  deleteUser: async (id: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/api/users/delete/${id}`);
+    return response.data;
+  },
 };

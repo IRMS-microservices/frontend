@@ -1,137 +1,222 @@
 import apiClient from './apiClient';
 import { io, Socket } from 'socket.io-client';
-import { ApiResponse, SocketEvent } from '@/types/common.types';
+import { ApiResponse } from '@/types/common.types';
 import {
     KitchenOrderResponse,
     KitchenOrderItemResponse,
-    KitchenOrderStatus,
 } from '@/types/kitchen.types';
 
-const SOCKET_URL =
-    process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:8099';
+// ─── Socket ─────────────────────────────────────────────────────────────────
+// Gateway proxies /socket.io/kitchen/* → kitchen-service /socket.io/*
+const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 
-let socket: Socket | null = null;
+let kitchenSocket: Socket | null = null;
 
-function getSocket(): Socket {
-    if (!socket || !socket.connected) {
-        const token = sessionStorage.getItem("token");
-        socket = io(SOCKET_URL, {
-            transports: ['websocket'],
+function getKitchenSocket(): Socket {
+    if (!kitchenSocket || !kitchenSocket.connected) {
+        const token = sessionStorage.getItem('token');
+        kitchenSocket = io(GATEWAY_URL, {
+            // Tell Socket.IO client to use the gateway-prefixed path
+            path: '/socket.io/kitchen/',
+            transports: ['websocket', 'polling'],
             autoConnect: true,
-            query: {
-                token: token
-            }
+            // Backend middleware reads token from handshake.auth.token
+            auth: { token },
         });
     }
-    return socket;
+    return kitchenSocket;
+}
+
+// ─── REST ────────────────────────────────────────────────────────────────────
+
+/**
+ * Query params for listing kitchen orders.
+ * Matches GET /api/kitchen-orders query params from the API docs.
+ */
+export interface KitchenOrderQuery {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    orderId?: string;
+    status?: string;
+    tableId?: string;
+    fireTimeStart?: string;
+    fireTimeEnd?: string;
+}
+
+/**
+ * Body for updating a kitchen order item's cooking status.
+ * Matches PUT /api/kitchen-order-items/{id} body from the API docs.
+ */
+export interface UpdateKitchenOrderItemRequest {
+    cookingStatus: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    notes?: string;
+}
+
+/**
+ * Body for updating a kitchen order.
+ * Matches PUT /api/kitchen-orders/{id}.
+ */
+export interface UpdateKitchenOrderRequest {
+    status?: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    [key: string]: unknown;
 }
 
 export const KitchenService = {
+    // ── Kitchen Orders ───────────────────────────────────────────────────────
+
     /**
-     * GET /kitchen/orders
-     * List all kitchen orders. Optionally filter by status.
+     * GET /api/kitchen-orders
+     * Retrieve kitchen display board tickets (KITCHEN role).
      */
     listOrders: async (
-        status?: KitchenOrderStatus
+        query?: KitchenOrderQuery
     ): Promise<ApiResponse<KitchenOrderResponse[]>> => {
-        const params = status ? { status } : {};
-        const response = await apiClient.get('/kitchen/orders', { params });
+        const response = await apiClient.get('/api/kitchen-orders', { params: query });
         return response.data;
     },
 
     /**
-     * GET /kitchen/orders/{kitchenOrderId}
+     * POST /api/kitchen-orders
+     * Create a new kitchen order.
+     */
+    createOrder: async (
+        body: Record<string, unknown>
+    ): Promise<ApiResponse<KitchenOrderResponse>> => {
+        const response = await apiClient.post('/api/kitchen-orders', body);
+        return response.data;
+    },
+
+    /**
+     * GET /api/kitchen-orders/{id}
      * Get a specific kitchen order by its ID.
      */
     getOrderById: async (
-        kitchenOrderId: number
+        kitchenOrderId: string
     ): Promise<ApiResponse<KitchenOrderResponse>> => {
-        const response = await apiClient.get(
-            `/kitchen/orders/${kitchenOrderId}`
-        );
+        const response = await apiClient.get(`/api/kitchen-orders/${kitchenOrderId}`);
         return response.data;
     },
 
     /**
-     * PATCH /kitchen/orders/{kitchenOrderId}/status
-     * Advance the status of a kitchen order
-     * (PENDING → PROCESSING → SERVED).
+     * PUT /api/kitchen-orders/{id}
+     * Update a kitchen order (e.g. advance status).
      */
-    advanceOrderStatus: async (
-        kitchenOrderId: number
+    updateOrder: async (
+        kitchenOrderId: string,
+        body: UpdateKitchenOrderRequest
     ): Promise<ApiResponse<KitchenOrderResponse>> => {
-        const response = await apiClient.patch(
-            `/kitchen/orders/${kitchenOrderId}/status`
-        );
+        const response = await apiClient.put(`/api/kitchen-orders/${kitchenOrderId}`, body);
         return response.data;
     },
 
     /**
-     * PATCH /kitchen/items/{kitchenItemId}/status
-     * Advance the cooking status of a single kitchen order item
-     * (NOT_STARTED → IN_PROGRESS → COMPLETED).
+     * DELETE /api/kitchen-orders/{id}
+     * Delete a kitchen order.
      */
-    advanceItemStatus: async (
-        kitchenItemId: number
+    deleteOrder: async (
+        kitchenOrderId: string
+    ): Promise<ApiResponse<void>> => {
+        const response = await apiClient.delete(`/api/kitchen-orders/${kitchenOrderId}`);
+        return response.data;
+    },
+
+    // ── Kitchen Order Items ──────────────────────────────────────────────────
+
+    /**
+     * PUT /api/kitchen-order-items/{id}
+     * Update individual item cooking status (KITCHEN role).
+     * Body: { cookingStatus: "READY"|"PREPARING"|"COMPLETED"|"CANCELLED", notes?: string }
+     */
+    updateOrderItem: async (
+        kitchenItemId: string,
+        body: UpdateKitchenOrderItemRequest
     ): Promise<ApiResponse<KitchenOrderItemResponse>> => {
-        const response = await apiClient.patch(
-            `/kitchen/items/${kitchenItemId}/status`
+        const response = await apiClient.put(
+            `/api/kitchen-order-items/${kitchenItemId}`,
+            body
         );
         return response.data;
     },
 
+    // ── Socket.IO ────────────────────────────────────────────────────────────
+
     /**
-     * Connect to the SocketIO server.
+     * Connect to the Kitchen Socket.IO namespace via the API Gateway.
      * Call once when the kitchen page mounts.
+     * After connecting, emit 'join' with { role: 'expeditor' | 'chef' } to
+     * subscribe to the appropriate room.
      */
     connect(): Socket {
-        return getSocket();
+        return getKitchenSocket();
     },
 
     /**
-     * Disconnect and destroy the SocketIO socket.
+     * Disconnect and destroy the Kitchen Socket.IO socket.
      * Call when the kitchen page unmounts.
      */
     disconnect(): void {
-        if (socket) {
-            socket.disconnect();
-            socket = null;
+        if (kitchenSocket) {
+            kitchenSocket.disconnect();
+            kitchenSocket = null;
         }
     },
 
     /**
-     * Subscribe to ORDER_STATUS_CHANGED events.
-     * Emitted by the backend whenever a KitchenOrder status changes.
+     * Join a kitchen room after connecting.
+     * role: 'expeditor' → receives order:created events
+     * role: 'chef'      → receives ticket:update events
      */
-    onKitchenOrderStatusChanged(
-        callback: (order: KitchenOrderResponse) => void
-    ): () => void {
-        const s = getSocket();
-        s.on(SocketEvent.KITCHEN_ORDER_STATUS_CHANGED, callback);
-        return () => s.off(SocketEvent.KITCHEN_ORDER_STATUS_CHANGED, callback);
+    joinRoom(role: 'expeditor' | 'chef'): void {
+        getKitchenSocket().emit('join', { role });
     },
 
     /**
-     * Subscribe to ITEM_STATUS_CHANGED events.
-     * Emitted by the backend whenever a KitchenOrderItem status changes.
+     * Subscribe to 'order:created' events.
+     * Emitted by the backend (room:expeditor) when a new KitchenOrder is created.
      */
-    onKitchenOrderItemStatusChanged(
-        callback: (item: KitchenOrderItemResponse) => void
+    onOrderCreated(
+        callback: (order: KitchenOrderResponse) => void
     ): () => void {
-        const s = getSocket();
-        s.on(SocketEvent.KITCHEN_ORDER_ITEM_STATUS_CHANGED, callback);
-        return () => s.off(SocketEvent.KITCHEN_ORDER_ITEM_STATUS_CHANGED, callback);
+        const s = getKitchenSocket();
+        s.on('order:created', callback);
+        return () => s.off('order:created', callback);
     },
 
     /**
-     * Subscribe to KITCHEN_ORDER_CREATED events.
-     * Emitted by the backend when a new KitchenOrder is created.
+     * Subscribe to 'ticket:update' events.
+     * Emitted by the backend (room:chef) when tickets are updated.
      */
-    onKitchenOrderCreated(
-        callback: (order: KitchenOrderResponse) => void
+    onTicketUpdate(
+        callback: (tickets: KitchenOrderResponse[]) => void
     ): () => void {
-        const s = getSocket();
-        s.on(SocketEvent.KITCHEN_ORDER_CREATED, callback);
-        return () => s.off(SocketEvent.KITCHEN_ORDER_CREATED, callback);
+        const s = getKitchenSocket();
+        s.on('ticket:update', callback);
+        return () => s.off('ticket:update', callback);
+    },
+
+    /**
+     * Subscribe to 'item:completed' events.
+     * Emitted by the backend (room:expeditor) when an item is completed.
+     */
+    onItemCompleted(
+        callback: (item: any) => void
+    ): () => void {
+        const s = getKitchenSocket();
+        s.on('item:completed', callback);
+        return () => s.off('item:completed', callback);
+    },
+
+    /**
+     * Subscribe to the 'joined' acknowledgment event.
+     * Fired by the backend after a successful room join.
+     */
+    onJoined(
+        callback: (data: { room: string }) => void
+    ): () => void {
+        const s = getKitchenSocket();
+        s.on('joined', callback);
+        return () => s.off('joined', callback);
     },
 };
