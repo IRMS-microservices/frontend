@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 
+interface Step2Data {
+  restaurantName: string;
+  businessType: string;
+}
+
 interface Step2Props {
   onBack: () => void;
-  onNext: () => void;
+  onNext: (data: Step2Data) => void;
 }
 
 export function Step2WorkspaceSetup({ onBack, onNext }: Step2Props) {
@@ -13,7 +18,7 @@ export function Step2WorkspaceSetup({ onBack, onNext }: Step2Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onNext();
+    onNext({ restaurantName, businessType });
   };
 
   return (

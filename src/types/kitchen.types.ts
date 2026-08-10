@@ -17,8 +17,9 @@ export enum SocketEventTypes {
 }
 
 export interface KitchenOrderItemResponse {
-    id: number;
+    _id: number;
     dishId: number;
+    restaurantId: string;
     dishName: string;
     quantity: number;
     notes: string;
@@ -28,9 +29,32 @@ export interface KitchenOrderItemResponse {
 }
 
 export interface KitchenOrderResponse {
-    id: number;
+    _id: number;
     orderId: number;
     status: KitchenOrderStatus;
     fireTime: string;
     items: KitchenOrderItemResponse[];
+}
+
+export interface KitchenOrderQuery {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    orderId?: string;
+    status?: string;
+    tableId?: string;
+    restaurantId?: string;
+    fireTimeStart?: string;
+    fireTimeEnd?: string;
+}
+
+export interface UpdateKitchenOrderItemRequest {
+    cookingStatus: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    notes?: string;
+}
+
+export interface UpdateKitchenOrderRequest {
+    status?: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    [key: string]: unknown;
 }

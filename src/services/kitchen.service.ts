@@ -1,9 +1,12 @@
 import apiClient from './apiClient';
 import { io, Socket } from 'socket.io-client';
-import { ApiResponse } from '@/types/common.types';
+import { ApiResponse, Pagination } from '@/types/common.types';
 import {
     KitchenOrderResponse,
     KitchenOrderItemResponse,
+    KitchenOrderQuery,
+    UpdateKitchenOrderItemRequest,
+    UpdateKitchenOrderRequest
 } from '@/types/kitchen.types';
 
 // ─── Socket ─────────────────────────────────────────────────────────────────
@@ -29,39 +32,6 @@ function getKitchenSocket(): Socket {
 
 // ─── REST ────────────────────────────────────────────────────────────────────
 
-/**
- * Query params for listing kitchen orders.
- * Matches GET /api/kitchen-orders query params from the API docs.
- */
-export interface KitchenOrderQuery {
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-    orderId?: string;
-    status?: string;
-    tableId?: string;
-    fireTimeStart?: string;
-    fireTimeEnd?: string;
-}
-
-/**
- * Body for updating a kitchen order item's cooking status.
- * Matches PUT /api/kitchen-order-items/{id} body from the API docs.
- */
-export interface UpdateKitchenOrderItemRequest {
-    cookingStatus: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
-    notes?: string;
-}
-
-/**
- * Body for updating a kitchen order.
- * Matches PUT /api/kitchen-orders/{id}.
- */
-export interface UpdateKitchenOrderRequest {
-    status?: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
-    [key: string]: unknown;
-}
 
 export const KitchenService = {
     // ── Kitchen Orders ───────────────────────────────────────────────────────
@@ -72,7 +42,7 @@ export const KitchenService = {
      */
     listOrders: async (
         query?: KitchenOrderQuery
-    ): Promise<ApiResponse<KitchenOrderResponse[]>> => {
+    ): Promise<ApiResponse<Pagination<KitchenOrderResponse[]>>> => {
         const response = await apiClient.get('/api/kitchen-orders', { params: query });
         return response.data;
     },

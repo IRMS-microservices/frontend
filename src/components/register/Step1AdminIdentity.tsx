@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 
+interface Step1Data {
+  fullName: string;
+  username: string;
+  phoneNumber: string;
+  password: string;
+}
+
 interface Step1Props {
-  onNext: () => void;
+  onNext: (data: Step1Data) => void;
 }
 
 export function Step1AdminIdentity({ onNext }: Step1Props) {
@@ -14,7 +21,7 @@ export function Step1AdminIdentity({ onNext }: Step1Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onNext();
+    onNext({ fullName, username: email, phoneNumber: phone, password });
   };
 
   return (

@@ -5,9 +5,21 @@ import { Step1AdminIdentity } from "@/components/register/Step1AdminIdentity";
 import { Step2WorkspaceSetup } from "@/components/register/Step2WorkspaceSetup";
 import { Step3Launch } from "@/components/register/Step3Launch";
 import { IrmsLogo } from "@/components/shared/IrmsLogo";
+import { WorkspaceRegisterData } from "@/types/auth.types";
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1);
+  const [registerData, setRegisterData] = useState<Partial<WorkspaceRegisterData>>({});
+
+  const handleStep1Next = (step1Data: Pick<WorkspaceRegisterData, "fullName" | "username" | "phoneNumber" | "password">) => {
+    setRegisterData((prev) => ({ ...prev, ...step1Data }));
+    setStep(2);
+  };
+
+  const handleStep2Next = (step2Data: Pick<WorkspaceRegisterData, "restaurantName" | "businessType">) => {
+    setRegisterData((prev) => ({ ...prev, ...step2Data }));
+    setStep(3);
+  };
 
   return (
     <div className="min-h-screen flex bg-white">
@@ -33,14 +45,14 @@ export default function RegisterPage() {
             <>
               <h1 className="text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight">Elevate<br />Every Course.</h1>
               <p className="text-lg lg:text-xl text-[#A7C4B5] leading-relaxed max-w-md font-medium">
-                "Precision in the kitchen translates to perfection on the plate. Our platform is the silent orchestrator of your culinary vision."
+                &quot;Precision in the kitchen translates to perfection on the plate. Our platform is the silent orchestrator of your culinary vision.&quot;
               </p>
             </>
           )}
 
           {step === 2 && (
             <div className="mt-40">
-              <h2 className="text-4xl font-bold mb-4 leading-tight">"Excellence is not an act,<br />but a habit."</h2>
+              <h2 className="text-4xl font-bold mb-4 leading-tight">&quot;Excellence is not an act,<br />but a habit.&quot;</h2>
               <p className="text-sm font-bold tracking-[0.2em] text-[#A7C4B5] uppercase">Curate Your Experience</p>
             </div>
           )}
@@ -49,7 +61,7 @@ export default function RegisterPage() {
             <div className="mt-20">
               <h2 className="text-4xl font-bold mb-6 leading-tight">Service is ready to<br />commence.</h2>
               <p className="text-lg text-[#A7C4B5] leading-relaxed max-w-md">
-                Your high-end restaurant management workspace has been meticulously prepared. Step into the digital Maître d' experience.
+                Your high-end restaurant management workspace has been meticulously prepared. Step into the digital Maître d&apos; experience.
               </p>
             </div>
           )}
@@ -69,9 +81,16 @@ export default function RegisterPage() {
         </div>
 
         <div className="w-full">
-          {step === 1 && <Step1AdminIdentity onNext={() => setStep(2)} />}
-          {step === 2 && <Step2WorkspaceSetup onBack={() => setStep(1)} onNext={() => setStep(3)} />}
-          {step === 3 && <Step3Launch />}
+          {step === 1 && <Step1AdminIdentity onNext={handleStep1Next} />}
+          {step === 2 && (
+            <Step2WorkspaceSetup
+              onBack={() => setStep(1)}
+              onNext={handleStep2Next}
+            />
+          )}
+          {step === 3 && registerData.fullName && (
+            <Step3Launch data={registerData as WorkspaceRegisterData} />
+          )}
         </div>
       </div>
     </div>

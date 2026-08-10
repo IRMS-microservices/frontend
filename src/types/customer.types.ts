@@ -10,3 +10,11 @@ export interface CustomerRequest {
     gender: string;
     phone: string;
 }
+
+export interface CustomerQuery {
+  name?: string;
+  phoneNumber?: string;
+  gender?: 'MALE' | 'FEMALE';
+  page?: number;
+  limit?: number;
+}

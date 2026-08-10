@@ -1,16 +1,35 @@
-export enum TableStatus {
-  AVAILABLE = "Available",
-  OCCUPIED = "Occupied",
-  DIRTY = "Dirty",
-  WAITING = "Waiting",
-}
+export type TableStatus = 'AVAILABLE' | 'OCCUPIED' | 'DIRTY' | 'WAITING';
 
 export interface TableResponse {
-  tableId: number;
-  tableNumber: string;
+  _id: string;
+  tableNumber: string | number;
   status: TableStatus;
   capacity: number;
-  currentGuestsNumber: number;
+  currentGuestsNumber?: number;
+  restaurantId: string;
+}
+
+export interface CreateTableRequest {
+  tableNumber: number | string;
+  capacity: number;
+  status?: TableStatus;
+  restaurantId: string;
+}
+
+export interface UpdateTableRequest {
+  tableNumber?: number | string;
+  capacity?: number;
+  status?: TableStatus;
+}
+
+export interface TableQuery {
+  tableNumber?: number | string;
+  status?: TableStatus;
+  minCapacity?: number;
+  maxCapacity?: number;
+  restaurantId?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface AssignTableRequest {

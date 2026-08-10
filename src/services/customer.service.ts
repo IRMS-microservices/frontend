@@ -1,14 +1,6 @@
 import apiClient from './apiClient';
-import { ApiResponse } from '../types/common.types';
-import { CustomerRequest, CustomerResponse } from '@/types/customer.types';
-
-export interface CustomerQuery {
-  name?: string;
-  phoneNumber?: string;
-  gender?: 'MALE' | 'FEMALE';
-  page?: number;
-  limit?: number;
-}
+import { ApiResponse, Pagination } from '../types/common.types';
+import { CustomerRequest, CustomerResponse, CustomerQuery } from '@/types/customer.types';
 
 export const CustomerService = {
   /**
@@ -16,8 +8,8 @@ export const CustomerService = {
    * Query customer records (ADMIN, SERVER).
    * Supports: name, phoneNumber, gender, page, limit
    */
-  getAllCustomers: async (query?: CustomerQuery): Promise<ApiResponse<CustomerResponse[]>> => {
-    const response = await apiClient.get<ApiResponse<CustomerResponse[]>>('/api/customers', { params: query });
+  getAllCustomers: async (query?: CustomerQuery): Promise<ApiResponse<Pagination<CustomerResponse[]>>> => {
+    const response = await apiClient.get<ApiResponse<Pagination<CustomerResponse[]>>>('/api/customers', { params: query });
     return response.data;
   },
 

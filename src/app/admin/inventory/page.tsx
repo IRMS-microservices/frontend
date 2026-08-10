@@ -1,24 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { InventoryItemPanel } from "@/components/admin/InventoryItemPanel";
+import { InventoryService } from "@/services/inventory.service";
+import { InventoryResponse } from "@/types/inventory.types";
 
 export default function AdminInventoryPage() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<"ADD" | "EDIT">("ADD");
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
-  const inventoryItems = [
-    { id: 1, name: "Heirloom Tomatoes", category: "PRODUCE", supplier: "Valle de Guadalupe Farm", quantity: 24, unit: "kg", status: "optimal" },
-    { id: 2, name: "Microgreens Mix", category: "PRODUCE", supplier: "Hydroponic Urban Farm", quantity: 1.5, unit: "kg", status: "low" },
-    { id: 3, name: "White Truffles", category: "PRODUCE", supplier: "Piedmont Import", quantity: 450, unit: "g", status: "optimal" },
-    { id: 4, name: "Chantarelles", category: "PRODUCE", supplier: "Seasonal Wild Foraged", quantity: 0.0, unit: "kg", status: "critical" },
-    { id: 5, name: "Heirloom Tomatoes", category: "PRODUCE", supplier: "Valle de Guadalupe Farm", quantity: 24, unit: "kg", status: "optimal" },
-    { id: 6, name: "Microgreens Mix", category: "PRODUCE", supplier: "Hydroponic Urban Farm", quantity: 1.5, unit: "kg", status: "low" },
-    { id: 7, name: "White Truffles", category: "PRODUCE", supplier: "Piedmont Import", quantity: 450, unit: "g", status: "optimal" },
-    { id: 8, name: "Chantarelles", category: "PRODUCE", supplier: "Seasonal Wild Foraged", quantity: 0.0, unit: "kg", status: "critical" },
-  ];
+  const [inventoryItems, setInventoryItems] = useState<InventoryResponse[]>([]);
+  const [animatedItemId, setAnimatedItemId] = useState<string | null>(null);
+
+  const loadInventory = async () => {
+    try {
+      const response = await InventoryService.listInventories({ limit: 999_999_999 });
+      if (response.data && response.data.data) {
+        setInventoryItems(response.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to load inventories", err);
+    }
+  };
+
+  useEffect(() => {
+    loadInventory();
+  }, []);
+
+  useEffect(() => {
+    InventoryService.connect();
+    const unsubscribe = InventoryService.onQuantityUpdated((payload) => {
+      setInventoryItems((prevItems) => {
+        const existingItemIndex = prevItems.findIndex((item) => item._id === payload._id);
+        let newItems = [...prevItems];
+        if (existingItemIndex > -1) {
+          const updatedItem = {
+            ...newItems[existingItemIndex],
+            quantity: payload.quantity,
+            unit: payload.unit,
+            lastImportQuantity: payload.lastImportQuantity,
+            warningThreshold: payload.warningThreshold
+          };
+          newItems.splice(existingItemIndex, 1);
+          newItems.unshift(updatedItem);
+        } else {
+          newItems.unshift(payload as any);
+        }
+        return newItems;
+      });
+
+      setAnimatedItemId(payload._id);
+      setTimeout(() => setAnimatedItemId(null), 1000); // 1s animation
+    });
+
+    return () => {
+      unsubscribe();
+      InventoryService.disconnect();
+    };
+  }, []);
 
   const handleEditItem = (item: any) => {
     setSelectedItem(item);
@@ -141,54 +182,50 @@ export default function AdminInventoryPage() {
 
           {/* Inventory Grid */}
           <div className="grid grid-cols-4 gap-6">
-            {inventoryItems.map((item, index) => (
-              <div
-                key={index}
-                onClick={() => handleEditItem(item)}
-                className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer flex flex-col h-full relative group"
-              >
-                {/* Image Placeholder Space - Required by specs */}
-                <div className="w-full h-32 bg-gray-50 rounded-xl mb-4 border border-gray-100 flex items-center justify-center text-gray-300">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                    <polyline points="21 15 16 10 5 21"></polyline>
-                  </svg>
+            {inventoryItems.map((item, index) => {
+              const warningLimit = item.lastImportQuantity ? item.lastImportQuantity * ((item.warningThreshold ?? 20) / 100) : 0;
+              let status = 'optimal';
+              if (item.quantity <= 0) {
+                status = 'critical';
+              } else if (warningLimit > 0 && item.quantity <= warningLimit) {
+                status = 'low';
+              }
+
+              return (
+                <div
+                  key={item._id || index}
+                  onClick={() => handleEditItem(item)}
+                  className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-500 cursor-pointer flex flex-col h-full relative group ${animatedItemId === item._id ? 'bg-green-50 scale-[1.02] shadow-md ring-2 ring-irms-green ring-opacity-50' : ''}`}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    {status === 'optimal' && (
+                      <div className="w-2 h-2 rounded-full bg-[#10B981]"></div>
+                    )}
+                    {status === 'low' && (
+                      <div className="w-3 h-3 rounded-full bg-[#64748B] flex items-center justify-center relative">
+                        <div className="absolute inset-0 rounded-full bg-[#64748B] opacity-50 animate-ping"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#64748B] relative z-10"></div>
+                      </div>
+                    )}
+                    {status === 'critical' && (
+                      <div className="bg-[#FEE2E2] text-[#EF4444] rounded-sm w-4 h-5 flex items-center justify-center font-bold text-xs relative">
+                        <div className="absolute inset-0 bg-[#FEE2E2] opacity-50 animate-ping"></div>
+                        <span className="relative z-10">!</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <h3 className="font-bold text-gray-800 text-lg leading-tight mb-1">{item.name}</h3>
+
+                  <div className="mt-auto">
+                    <p className="text-[10px] font-bold text-gray-400 tracking-wider uppercase mb-1">Quantity</p>
+                    <p className={`text-2xl font-bold ${status === 'critical' ? 'text-[#EF4444]' : 'text-gray-900'}`}>
+                      {item.quantity} <span className="text-sm font-semibold">{item.unit}</span>
+                    </p>
+                  </div>
                 </div>
-
-                <div className="flex justify-between items-start mb-3">
-                  <span className="bg-[#F1F5F9] text-[#475569] text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider">
-                    {item.category}
-                  </span>
-
-                  {item.status === 'optimal' && (
-                    <div className="w-2 h-2 rounded-full bg-[#10B981]"></div>
-                  )}
-                  {item.status === 'low' && (
-                    <div className="w-3 h-3 rounded-full bg-[#64748B] flex items-center justify-center relative">
-                      <div className="absolute inset-0 rounded-full bg-[#64748B] opacity-50 animate-ping"></div>
-                      <div className="w-2 h-2 rounded-full bg-[#64748B] relative z-10"></div>
-                    </div>
-                  )}
-                  {item.status === 'critical' && (
-                    <div className="bg-[#FEE2E2] text-[#EF4444] rounded-sm w-4 h-5 flex items-center justify-center font-bold text-xs relative">
-                      <div className="absolute inset-0 bg-[#FEE2E2] opacity-50 animate-ping"></div>
-                      <span className="relative z-10">!</span>
-                    </div>
-                  )}
-                </div>
-
-                <h3 className="font-bold text-gray-800 text-lg leading-tight mb-1">{item.name}</h3>
-                <p className="text-xs text-gray-500 mb-6">{item.supplier}</p>
-
-                <div className="mt-auto">
-                  <p className="text-[10px] font-bold text-gray-400 tracking-wider uppercase mb-1">Quantity</p>
-                  <p className={`text-2xl font-bold ${item.status === 'critical' ? 'text-[#EF4444]' : 'text-gray-900'}`}>
-                    {item.quantity} <span className="text-sm font-semibold">{item.unit}</span>
-                  </p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
@@ -209,7 +246,10 @@ export default function AdminInventoryPage() {
         onClose={() => setIsPanelOpen(false)}
         mode={panelMode}
         item={selectedItem}
-        onSuccess={() => setIsPanelOpen(false)}
+        onSuccess={() => {
+          setIsPanelOpen(false);
+          loadInventory();
+        }}
       />
     </div>
   );

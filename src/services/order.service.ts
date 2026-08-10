@@ -1,31 +1,6 @@
 import apiClient from './apiClient';
-import { CreateOrderRequest, OrderResponse } from '../types/menuOrder.types';
-import { ApiResponse } from '@/types/common.types';
-
-export interface OrderQuery {
-  page?: number;
-  limit?: number;
-  tableId?: string;
-  customerId?: string;
-  customerName?: string;
-  customerPhone?: string;
-  paymentStatus?: string;
-  serviceStatus?: string;
-  createdBy?: string;
-  note?: string;
-  startDate?: string;
-  endDate?: string;
-}
-
-export interface UpdateOrderRequest {
-  tableId?: string;
-  customerId?: string;
-  customerName?: string;
-  customerPhone?: string;
-  paymentStatus?: 'PENDING' | 'PAID' | 'CANCELLED';
-  serviceStatus?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
-  note?: string;
-}
+import { CreateOrderRequest, OrderResponse, OrderQuery, UpdateOrderRequest } from '../types/menuOrder.types';
+import { ApiResponse, Pagination } from '@/types/common.types';
 
 export const OrderService = {
   /**
@@ -43,7 +18,7 @@ export const OrderService = {
    * Supports: page, limit, tableId, customerId, customerName, customerPhone,
    *           paymentStatus, serviceStatus, createdBy, note, startDate, endDate
    */
-  getOrders: async (query?: OrderQuery): Promise<ApiResponse<OrderResponse[]>> => {
+  getOrders: async (query?: OrderQuery): Promise<ApiResponse<Pagination<OrderResponse[]>>> => {
     const response = await apiClient.get('/api/orders', { params: query });
     return response.data;
   },

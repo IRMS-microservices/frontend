@@ -19,6 +19,7 @@ export enum DishCategory {
 
 export interface DishResponse {
   dishId: number;
+  restaurantId: string;
   name: string;
   category: DishCategory;
   basePrice: number;
@@ -37,6 +38,7 @@ export interface OrderItemResponse {
 
 export interface OrderResponse {
   orderId: number;
+  restaurantId: string;
   tableId: number;
   customerId: number | null;
   totalAmount: number;
@@ -59,4 +61,43 @@ export interface CreateOrderRequest {
   customerId: number;
   note?: string;
   items: OrderItemRequest[];
+}
+
+export interface OrderQuery {
+  page?: number;
+  limit?: number;
+  tableId?: string;
+  restaurantId?: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  paymentStatus?: string;
+  serviceStatus?: string;
+  createdBy?: string;
+  note?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface UpdateOrderRequest {
+  tableId?: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  paymentStatus?: 'PENDING' | 'PAID' | 'CANCELLED';
+  serviceStatus?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  note?: string;
+}
+
+export interface DishQuery {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  name?: string;
+  restaurantId?: string;
+  category?: string;
+  isAvailable?: boolean;
+  minPrice?: number;
+  maxPrice?: number;
 }

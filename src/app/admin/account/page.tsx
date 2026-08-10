@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { UserService, UserResponse } from "@/services/user.service";
+import { UserService } from "@/services/user.service";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { NewStaffPanel } from "@/components/admin/NewStaffPanel";
+import { Pagination } from "@/types/common.types";
+import { UserResponse } from "@/types/user.types";
 
 export default function AdminAccountPage() {
-  const [users, setUsers] = useState<UserResponse[]>([]);
+  const [users, setUsers] = useState<Pagination<UserResponse[]>>({ data: [], total: 0, page: 1, limit: 10, totalPages: 1 });
   const [isFetching, setIsFetching] = useState(true);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
@@ -28,8 +30,16 @@ export default function AdminAccountPage() {
     }
   };
 
-  const activeShifts = 12; // Dummy data
-  const pendingRequests = 3; // Dummy data
+  const onPageSwitch = async (page: number) => {
+    try {
+      const response = await UserService.listUsers({ page });
+      if (response.success && response.data) {
+        setUsers(response.data);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch users:", err);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex">
@@ -58,7 +68,7 @@ export default function AdminAccountPage() {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
               <div>
                 <p className="text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">Total Staff</p>
-                <h3 className="text-4xl font-bold text-irms-text-primary">{users.length}</h3>
+                <h3 className="text-4xl font-bold text-irms-text-primary">{users.total}</h3>
               </div>
               <p className="text-xs text-irms-green font-semibold mt-4 flex items-center gap-1">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -72,7 +82,7 @@ export default function AdminAccountPage() {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
               <div>
                 <p className="text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">Active Shifts</p>
-                <h3 className="text-4xl font-bold text-irms-text-primary">{activeShifts}</h3>
+                <h3 className="text-4xl font-bold text-irms-text-primary">{users.total}</h3>
               </div>
               <p className="text-xs text-gray-500 font-semibold mt-4 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-green-400"></span> Live operations
@@ -82,7 +92,7 @@ export default function AdminAccountPage() {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
               <div>
                 <p className="text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">Pending Requests</p>
-                <h3 className="text-4xl font-bold text-irms-text-primary">{pendingRequests}</h3>
+                <h3 className="text-4xl font-bold text-irms-text-primary">{users.total}</h3>
               </div>
               <p className="text-xs text-gray-500 font-semibold mt-4">Leave & Shift Swaps</p>
             </div>
@@ -142,17 +152,17 @@ export default function AdminAccountPage() {
                     <td colSpan={5} className="p-8 text-center text-gray-400">Loading directory...</td>
                   </tr>
                 ) : (
-                  users.map((user) => {
+                  users.data.map((user: UserResponse) => {
                     const initials = user.fullName
                       ? user.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-                      : user.username.substring(0, 2).toUpperCase();
+                      : user.username?.substring(0, 2).toUpperCase();
 
                     const roleColor = user.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
                       user.role === 'KITCHEN' ? 'bg-green-100 text-green-700' :
                         'bg-blue-100 text-blue-700';
 
                     return (
-                      <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={user._id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 flex items-center gap-4">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${user.role === 'ADMIN' ? 'bg-[#D1F2D1] text-irms-green' :
                             user.role === 'KITCHEN' ? 'bg-[#E0E7FF] text-[#4F46E5]' :
@@ -199,13 +209,40 @@ export default function AdminAccountPage() {
             </table>
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-between items-center text-sm text-gray-500">
-              <span>Showing {users.length} of {users.length} members</span>
+              <span>Showing {users.limit * (users.page - 1) + 1} - {Math.min(users.limit * users.page, users.total)} of {users.total} members</span>
               <div className="flex gap-1">
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100">&lt;</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-irms-green text-white font-bold">1</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100">2</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100">3</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100">&gt;</button>
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    const currentGroupStart = Math.floor((users.page - 1) / 5) * 5 + 1;
+                    onPageSwitch(Math.max(1, currentGroupStart - 1));
+                  }}
+                  disabled={users.page <= 5}
+                >
+                  &lt;
+                </button>
+                {Array.from({ length: Math.min(5, users.totalPages - Math.floor((users.page - 1) / 5) * 5) }, (_, i) => {
+                  const pageNum = Math.floor((users.page - 1) / 5) * 5 + i + 1;
+                  return (
+                    <button
+                      key={pageNum}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold ${users.page === pageNum ? 'bg-irms-green text-white' : 'bg-gray-50 hover:bg-gray-100'}`}
+                      onClick={() => onPageSwitch(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    const currentGroupStart = Math.floor((users.page - 1) / 5) * 5 + 1;
+                    onPageSwitch(Math.min(users.totalPages, currentGroupStart + 5));
+                  }}
+                  disabled={Math.floor((users.page - 1) / 5) * 5 + 5 >= users.totalPages}
+                >
+                  &gt;
+                </button>
               </div>
             </div>
           </div>

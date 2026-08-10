@@ -1,35 +1,13 @@
 import apiClient from "./apiClient";
-import { ApiResponse } from "@/types/common.types";
+import { ApiResponse, Pagination } from "@/types/common.types";
 
-export type TableStatus = 'AVAILABLE' | 'OCCUPIED';
-
-export interface TableResponse {
-  id: string;
-  tableNumber: number | string;
-  status: TableStatus;
-  capacity: number;
-}
-
-export interface CreateTableRequest {
-  tableNumber: number | string;
-  capacity: number;
-  status?: TableStatus;
-}
-
-export interface UpdateTableRequest {
-  tableNumber?: number | string;
-  capacity?: number;
-  status?: TableStatus;
-}
-
-export interface TableQuery {
-  tableNumber?: number | string;
-  status?: TableStatus;
-  minCapacity?: number;
-  maxCapacity?: number;
-  page?: number;
-  limit?: number;
-}
+import {
+  TableStatus,
+  TableResponse,
+  CreateTableRequest,
+  UpdateTableRequest,
+  TableQuery
+} from '../types/table.types';
 
 export const TableService = {
   /**
@@ -37,8 +15,8 @@ export const TableService = {
    * Query floor table status (SERVER, ADMIN).
    * Supports: tableNumber, status, minCapacity, maxCapacity, page, limit
    */
-  getTables: async (query?: TableQuery): Promise<ApiResponse<TableResponse[]>> => {
-    const response = await apiClient.get<ApiResponse<TableResponse[]>>("/api/tables", {
+  getTables: async (query?: TableQuery): Promise<ApiResponse<Pagination<TableResponse[]>>> => {
+    const response = await apiClient.get<ApiResponse<Pagination<TableResponse[]>>>("/api/tables", {
       params: query,
     });
     return response.data;

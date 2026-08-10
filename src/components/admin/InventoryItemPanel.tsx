@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { InventoryService } from "@/services/inventory.service";
 
 interface InventoryItemPanelProps {
   isOpen: boolean;
@@ -15,7 +16,7 @@ export function InventoryItemPanel({ isOpen, onClose, mode, item, onSuccess }: I
   const [quantity, setQuantity] = useState<number | string>("");
   const [category, setCategory] = useState("PRODUCE");
   const [unit, setUnit] = useState("kg");
-  const [image, setImage] = useState<File | null>(null);
+  const [warningThreshold, setWarningThreshold] = useState<number | string>(20);
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,13 +26,13 @@ export function InventoryItemPanel({ isOpen, onClose, mode, item, onSuccess }: I
       setQuantity(item.quantity || "");
       setCategory(item.category || "PRODUCE");
       setUnit(item.unit || "kg");
-      setImage(null);
+      setWarningThreshold(item.warningThreshold || 20);
     } else {
       setName("");
       setQuantity("");
       setCategory("PRODUCE");
       setUnit("kg");
-      setImage(null);
+      setWarningThreshold(20);
     }
   }, [mode, item, isOpen]);
 
@@ -39,16 +40,31 @@ export function InventoryItemPanel({ isOpen, onClose, mode, item, onSuccess }: I
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      if (mode === "ADD") {
+        await InventoryService.createInventory({
+          name,
+          quantity: Number(quantity),
+          unit: unit as any, // EUnit
+          warningThreshold: Number(warningThreshold)
+        });
+      } else if (mode === "EDIT" && item) {
+        // Find correct adjustment if any
+        let delta = Number(quantity) - Number(item.quantity || 0);
+        if (delta !== 0) {
+          await InventoryService.adjustQuantity({
+            name: item.name,
+            delta: delta,
+            unit: unit as any,
+            reason: 'IMPORT'
+          });
+        }
+      }
       onSuccess();
-    }, 800);
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImage(e.target.files[0]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -136,6 +152,21 @@ export function InventoryItemPanel({ isOpen, onClose, mode, item, onSuccess }: I
                     className="w-full bg-[#F8F9FA] border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-irms-green focus:border-transparent focus:outline-none transition-shadow"
                   />
                 </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 block">
+                    Warning Threshold (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    required
+                    value={warningThreshold}
+                    onChange={(e) => setWarningThreshold(e.target.value)}
+                    placeholder="e.g. 20"
+                    className="w-full bg-[#F8F9FA] border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-irms-green focus:border-transparent focus:outline-none transition-shadow"
+                  />
+                </div>
               </div>
             )}
 
@@ -165,33 +196,6 @@ export function InventoryItemPanel({ isOpen, onClose, mode, item, onSuccess }: I
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 block">
-                Item Image
-              </label>
-              <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-[#F8F9FA] hover:bg-gray-50 transition-colors relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <svg className="text-gray-400 mb-3" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                  <polyline points="21 15 16 10 5 21"></polyline>
-                </svg>
-                {image ? (
-                  <span className="text-sm font-semibold text-irms-green">{image.name}</span>
-                ) : (
-                  <>
-                    <span className="text-sm font-semibold text-gray-600">Click to upload image</span>
-                    <span className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</span>
-                  </>
-                )}
               </div>
             </div>
 

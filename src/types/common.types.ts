@@ -13,11 +13,19 @@ export interface ErrorDetails {
 }
 
 export interface ApiResponse<T = any> {
-  timestamp: string;
+  timestamp?: string;
   success: boolean;
   message: string;
   data: T;
   error?: ErrorDetails;
+}
+
+export interface Pagination<T = any> {
+  data: T;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export enum SocketEvent {

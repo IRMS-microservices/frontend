@@ -15,4 +15,17 @@ export interface RegisterRequest {
   fullName?: string;
   phoneNumber?: string;
   role?: string;
+  restaurantId?: string;
+}
+
+/** Aggregated data collected across all steps of the registration wizard. */
+export interface WorkspaceRegisterData {
+  // Step 1 — Admin Identity
+  fullName: string;
+  username: string;
+  phoneNumber: string;
+  password: string;
+  // Step 2 — Workspace / Restaurant Info
+  restaurantName: string;
+  businessType: string;
 }

@@ -1,68 +1,16 @@
 import apiClient from './apiClient';
 import { io, Socket } from 'socket.io-client';
-import { ApiResponse } from '@/types/common.types';
+import { ApiResponse, Pagination } from '@/types/common.types';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-/** Measurement units as defined in EUnits. */
-export type EUnit = 'KG' | 'G' | 'L' | 'ML' | 'PCS';
-
-/** A single inventory item returned by the API. */
-export interface InventoryResponse {
-    _id: string;
-    name: string;
-    quantity: number;
-    unit: EUnit;
-    createdAt?: string;
-    updatedAt?: string;
-}
-
-/** Body for POST /api/inventories — create a new stock entry (ADMIN only). */
-export interface CreateInventoryRequest {
-    name: string;
-    quantity: number;
-    unit: EUnit;
-}
-
-/** Body for PUT /api/inventories/{id} — update an inventory entry (ADMIN only). */
-export interface UpdateInventoryRequest {
-    name?: string;
-    quantity?: number;
-    unit?: EUnit;
-}
-
-/**
- * Body for PATCH /api/inventories/quantity
- * Unit-aware atomic inventory adjustment (ADMIN, KITCHEN).
- */
-export interface AdjustInventoryQuantityRequest {
-    name: string;
-    delta: number;
-    unit: EUnit;
-}
-
-/** Query params for GET /api/inventories. */
-export interface InventoryQuery {
-    page?: number;
-    limit?: number;
-    name?: string;
-    unit?: EUnit;
-    minQuantity?: number;
-    maxQuantity?: number;
-}
-
-/**
- * Socket payload emitted as 'inventory:quantity_updated'
- * by the menu-inventory-service after any quantity mutation.
- */
-export interface InventoryUpdatePayload {
-    _id: string;
-    name: string;
-    quantity: number;
-    unit: string;
-    createdAt?: string;
-    updatedAt?: string;
-}
+import {
+    EUnit,
+    InventoryResponse,
+    CreateInventoryRequest,
+    UpdateInventoryRequest,
+    AdjustInventoryQuantityRequest,
+    InventoryQuery,
+    InventoryUpdatePayload
+} from '@/types/inventory.types';
 
 // ─── Socket ─────────────────────────────────────────────────────────────────
 // Gateway proxies /socket.io/inventories/* → menu-inventory-service /socket.io/*
@@ -98,7 +46,7 @@ export const InventoryService = {
      */
     listInventories: async (
         query?: InventoryQuery
-    ): Promise<ApiResponse<InventoryResponse[]>> => {
+    ): Promise<ApiResponse<Pagination<InventoryResponse[]>>> => {
         const response = await apiClient.get('/api/inventories', { params: query });
         return response.data;
     },
