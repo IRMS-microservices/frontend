@@ -2,7 +2,6 @@ import apiClient from "./apiClient";
 import { ApiResponse, Pagination } from "@/types/common.types";
 
 import {
-  TableStatus,
   TableResponse,
   CreateTableRequest,
   UpdateTableRequest,

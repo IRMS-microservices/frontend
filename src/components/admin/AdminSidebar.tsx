@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { CreditCard, Table2, UtensilsCrossed } from "lucide-react";
 import { IrmsLogo } from "@/components/shared/IrmsLogo";
 import { AuthService } from "@/services/auth.service";
 
@@ -26,6 +27,26 @@ export function AdminSidebar() {
       </div>
 
       <nav className="flex-1 px-4 mt-6 flex flex-col gap-2">
+        <Link
+          href="/admin/tables"
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${pathname.startsWith("/admin/tables")
+              ? "bg-white text-irms-text-primary shadow-sm"
+              : "text-gray-500 hover:bg-white/50"
+            }`}
+        >
+          <Table2 className="w-4.5 h-4.5" />
+          Tables
+        </Link>
+        <Link
+          href="/admin/menu"
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${pathname.startsWith("/admin/menu")
+              ? "bg-white text-irms-text-primary shadow-sm"
+              : "text-gray-500 hover:bg-white/50"
+            }`}
+        >
+          <UtensilsCrossed className="w-4.5 h-4.5" />
+          Menu
+        </Link>
         <Link
           href="/admin/account"
           className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${pathname.startsWith("/admin/account")
@@ -54,6 +75,16 @@ export function AdminSidebar() {
             <line x1="9" y1="21" x2="9" y2="9"></line>
           </svg>
           Inventory Control
+        </Link>
+        <Link
+          href="/admin/payment-setting"
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${pathname.startsWith("/admin/payment-setting")
+              ? "bg-white text-irms-text-primary shadow-sm"
+              : "text-gray-500 hover:bg-white/50"
+            }`}
+        >
+          <CreditCard className="w-4.5 h-4.5" />
+          Payment Setting
         </Link>
       </nav>
 

@@ -3,9 +3,7 @@
 import { Topbar } from "@/components/shared/Topbar";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { KitchenService } from "@/services/kitchen.service";
-import {
-  KitchenOrderResponse,
-} from "@/types/kitchen.types";
+import { KitchenOrderResponse } from "@/types/kitchen.types";
 import useElapsed from "@/hooks/useElapsed";
 
 // ---------------------------------------------------------------------------
@@ -18,7 +16,7 @@ import useElapsed from "@/hooks/useElapsed";
  * The backend sends the already-grouped array — no client-side grouping needed.
  */
 interface Ticket {
-  key: string;          // unique key derived from the order for React
+  key: string; // unique key derived from the order for React
   dishName: string;
   groupFireTimeMs: number;
   rows: { tableId: string | number; kitchenItemId: string; quantity: number }[];
@@ -50,7 +48,9 @@ function parseFireTime(fireTime: any): number {
   }
   if (typeof fireTime === "string") return new Date(fireTime).getTime();
   if (typeof fireTime === "number") {
-    return fireTime < 1_000_000_000_000 ? Math.floor(fireTime * 1000) : fireTime;
+    return fireTime < 1_000_000_000_000
+      ? Math.floor(fireTime * 1000)
+      : fireTime;
   }
   return Date.now();
 }
@@ -61,10 +61,16 @@ function ordersToTickets(orders: KitchenOrderResponse[]): Ticket[] {
     const fireMs = parseFireTime(order.fireTime);
     for (const item of order.items) {
       tickets.push({
-        key: `${order.id}-${item.id}`,
+        key: `${order._id}-${item._id}`,
         dishName: item.dishName,
         groupFireTimeMs: fireMs,
-        rows: [{ tableId: order.orderId, kitchenItemId: String(item.id), quantity: item.quantity }],
+        rows: [
+          {
+            tableId: order.orderId,
+            kitchenItemId: String(item._id),
+            quantity: item.quantity,
+          },
+        ],
         totalQty: item.quantity,
         bumped: false,
       });
@@ -78,7 +84,10 @@ function ordersToTickets(orders: KitchenOrderResponse[]): Ticket[] {
  * If a ticket key already exists (and hasn't been bumped), overwrite it;
  * if it's new, append it.
  */
-function mergeTickets(prev: Ticket[], incoming: KitchenOrderResponse[]): Ticket[] {
+function mergeTickets(
+  prev: Ticket[],
+  incoming: KitchenOrderResponse[],
+): Ticket[] {
   const incomingTickets = ordersToTickets(incoming);
   const map = new Map(prev.map((t) => [t.key, t]));
   for (const t of incomingTickets) {
@@ -222,9 +231,12 @@ export default function ChefViewPage() {
 
     async function load() {
       try {
-        const res = await KitchenService.listOrders({ status: "PENDING" });
+        const res = await KitchenService.listOrders({
+          status: "PENDING",
+          limit: 999_999_999,
+        });
         if (cancelled) return;
-        const sorted = (res.data ?? [])
+        const sorted = (res.data.data ?? [])
           .slice()
           .sort(
             (a, b) =>
@@ -239,7 +251,9 @@ export default function ChefViewPage() {
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ---------------------------------------------------------------------------

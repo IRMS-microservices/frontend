@@ -29,7 +29,7 @@ export default function ExpeditorViewPage() {
 
   const buildTicket = useCallback(
     (ko: KitchenOrderResponse, tableId: number): Ticket => ({
-      kitchenOrderId: ko.id,
+      kitchenOrderId: ko._id,
       orderId: ko.orderId,
       tableId,
       fireTime: ko.fireTime,
@@ -43,12 +43,18 @@ export default function ExpeditorViewPage() {
     try {
       setLoading(true);
       const [kitchenRes, ordersRes] = await Promise.all([
-        KitchenService.listOrders({ status: KitchenOrderStatus.PENDING }),
-        OrderService.getOrders({ serviceStatus: "PENDING" }),
+        KitchenService.listOrders({
+          status: KitchenOrderStatus.PENDING,
+          limit: 999_999_999,
+        }),
+        OrderService.getOrders({
+          serviceStatus: "PENDING",
+          limit: 999_999_999,
+        }),
       ]);
 
-      const kitchenOrders: KitchenOrderResponse[] = kitchenRes.data ?? [];
-      const waitingOrders = ordersRes.data ?? [];
+      const kitchenOrders: KitchenOrderResponse[] = kitchenRes.data.data ?? [];
+      const waitingOrders = ordersRes.data.data ?? [];
 
       const tableMap = new Map<number, number>(
         waitingOrders.map((o) => [o.orderId, o.tableId]),
@@ -90,7 +96,9 @@ export default function ExpeditorViewPage() {
 
         if (tableId === undefined) {
           try {
-            const res = await OrderService.getOrderById(String(newOrder.orderId));
+            const res = await OrderService.getOrderById(
+              String(newOrder.orderId),
+            );
             if (res.data) {
               tableId = Number(res.data.tableId);
               orderIdToTableIdRef.current.set(newOrder.orderId, tableId);
@@ -111,20 +119,24 @@ export default function ExpeditorViewPage() {
       (completedItem: any) => {
         setTickets((prev) =>
           prev.map((ticket) => {
-            if (completedItem.orderId && String(ticket.orderId) !== String(completedItem.orderId)) {
+            if (
+              completedItem.orderId &&
+              String(ticket.orderId) !== String(completedItem.orderId)
+            ) {
               return ticket;
             }
             return {
               ...ticket,
               items: ticket.items.map((item) =>
-                String(item.id) === String(completedItem._id || completedItem.id)
+                String(item._id) ===
+                String(completedItem._id || completedItem.id)
                   ? { ...item, cookingStatus: CookingStatus.COMPLETED }
-                  : item
+                  : item,
               ),
             };
-          })
+          }),
         );
-      }
+      },
     );
 
     return () => {
@@ -140,8 +152,12 @@ export default function ExpeditorViewPage() {
     setBumpingIds((prev) => new Set(prev).add(ticket.kitchenOrderId));
     try {
       await Promise.all([
-        KitchenService.updateOrder(String(ticket.kitchenOrderId), { status: "COMPLETED" }),
-        OrderService.updateOrder(String(ticket.orderId), { serviceStatus: "CONFIRMED" }),
+        KitchenService.updateOrder(String(ticket.kitchenOrderId), {
+          status: "COMPLETED",
+        }),
+        OrderService.updateOrder(String(ticket.orderId), {
+          serviceStatus: "CONFIRMED",
+        }),
       ]);
       setTickets((prev) =>
         prev.filter((t) => t.kitchenOrderId !== ticket.kitchenOrderId),
@@ -271,7 +287,7 @@ export default function ExpeditorViewPage() {
                         item.cookingStatus === CookingStatus.COMPLETED;
                       return (
                         <div
-                          key={item.id}
+                          key={item._id}
                           className="flex items-center justify-between gap-2"
                         >
                           <span className="text-sm font-semibold text-irms-text-primary truncate">

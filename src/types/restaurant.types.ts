@@ -17,10 +17,12 @@ export interface CreateRestaurantRequest {
   name: string;
   address?: string;
   phone?: string;
+  pin?: string | number;
 }
 
 export interface UpdateRestaurantRequest {
   name?: string;
   address?: string;
   phone?: string;
+  pin?: string | number;
 }

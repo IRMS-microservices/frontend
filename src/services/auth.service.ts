@@ -1,6 +1,13 @@
 import apiClient, { clearSession, saveSession } from './apiClient';
 import { ApiResponse } from '../types/common.types';
-import { LoginRequest, AuthResponse, RegisterRequest, WorkspaceRegisterData } from '../types/auth.types';
+import {
+  CredentialAccessTokenResponse,
+  LoginRequest,
+  AuthResponse,
+  RegisterRequest,
+  VerifyRestaurantPinRequest,
+  WorkspaceRegisterData,
+} from '../types/auth.types';
 import { RestaurantService } from './restaurant.service';
 
 export const AuthService = {
@@ -13,7 +20,8 @@ export const AuthService = {
     const loginRes = response.data;
     if (loginRes.success) {
       // Backend returns { accessToken, refreshToken? } — store accessToken as "token"
-      saveSession(loginRes.data.accessToken ?? (loginRes.data as any).token, loginRes.data.role);
+      const loginData = loginRes.data as AuthResponse & { token?: string };
+      saveSession(loginData.accessToken ?? loginData.token ?? '', loginData.role);
     }
     return loginRes;
   },
@@ -47,6 +55,17 @@ export const AuthService = {
   },
 
   /**
+   * POST /api/restaurants/pin/verify
+   * Verify a restaurant PIN and receive a short-lived credential access token.
+   */
+  verifyRestaurantPin: async (
+    request: VerifyRestaurantPinRequest,
+  ): Promise<ApiResponse<CredentialAccessTokenResponse>> => {
+    const response = await apiClient.post<ApiResponse<CredentialAccessTokenResponse>>('/api/restaurants/pin/verify', request);
+    return response.data;
+  },
+
+  /**
    * Multi-step registration wizard:
    * 1. POST /api/restaurants  — create workspace
    * 2. POST /api/auth/register — create ADMIN user linked to that workspace
@@ -61,7 +80,7 @@ export const AuthService = {
       return {
         success: false,
         message: restaurantRes.message ?? 'Failed to create restaurant workspace.',
-        data: null as any,
+        data: null as unknown as AuthResponse,
       };
     }
 

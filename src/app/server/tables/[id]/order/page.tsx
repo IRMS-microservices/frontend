@@ -10,7 +10,7 @@ import { MenuService } from "@/services/menu.service";
 import { OrderService } from "@/services/order.service";
 import { DishCategory, DishResponse } from "@/types/menuOrder.types";
 
-type Category = "APPETIZERS" | "MAIN COURSE" | "DRINKS" | "DESSERTS";
+type Category = "APPETIZERS" | "MAIN_COURSE" | "DRINKS" | "DESSERTS";
 
 interface MenuItem {
   id: number;
@@ -34,22 +34,6 @@ const STATUS_COLORS = {
   "SOLD OUT": "bg-red-500 text-white",
 };
 
-const mapCategory = (backendCat: DishCategory): Category => {
-  if (backendCat === "Appetizer") return "APPETIZERS";
-  if (backendCat === "Main_Course") return "MAIN COURSE";
-  if (backendCat === "Beverage") return "DRINKS";
-  if (backendCat === "Dessert") return "DESSERTS";
-  return "MAIN COURSE";
-};
-
-const getEmojiForCategory = (cat: DishCategory) => {
-  if (cat === "Appetizer") return "🥗";
-  if (cat === "Main_Course") return "🥩";
-  if (cat === "Beverage") return "🍷";
-  if (cat === "Dessert") return "🍰";
-  return "🍽️";
-};
-
 export default function OrderPage({
   params,
 }: {
@@ -61,7 +45,7 @@ export default function OrderPage({
 
   const [menuData, setMenuData] = useState<Record<Category, MenuItem[]>>({
     APPETIZERS: [],
-    "MAIN COURSE": [],
+    MAIN_COURSE: [],
     DRINKS: [],
     DESSERTS: [],
   });
@@ -109,23 +93,24 @@ export default function OrderPage({
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const dishesResponse = await MenuService.getDishes();
-        const dishes = dishesResponse.data;
+        const dishesResponse = await MenuService.getDishes({
+          limit: 999_999_999,
+        });
+        const dishes = dishesResponse.data.data;
         const grouped: Record<Category, MenuItem[]> = {
           APPETIZERS: [],
-          "MAIN COURSE": [],
+          MAIN_COURSE: [],
           DRINKS: [],
           DESSERTS: [],
         };
 
         dishes.forEach((dish) => {
-          const cat = mapCategory(dish.category);
-          grouped[cat].push({
+          grouped[dish.category as Category].push({
             id: dish.dishId,
             name: dish.name,
             price: dish.basePrice,
             status: dish.available ? "IN STOCK" : "SOLD OUT",
-            image: dish.imageUrl || getEmojiForCategory(dish.category),
+            image: dish.imageUrl,
             originalDish: dish,
           });
         });
@@ -277,7 +262,7 @@ export default function OrderPage({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          getEmojiForCategory(item.originalDish.category)
+                          "No image"
                         )}
                       </div>
 
@@ -377,7 +362,7 @@ export default function OrderPage({
         </div>
 
         {/* Cart */}
-        <div className="w-[400px] shrink-0 bg-white border-l border-irms-border flex flex-col">
+        <div className="w-100 shrink-0 bg-white border-l border-irms-border flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-irms-border">
             <h2 className="text-lg font-bold text-irms-text-primary">
               Current Cart

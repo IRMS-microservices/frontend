@@ -2,7 +2,7 @@ export type TableStatus = 'AVAILABLE' | 'OCCUPIED' | 'DIRTY' | 'WAITING';
 
 export interface TableResponse {
   _id: string;
-  tableNumber: string | number;
+  tableNumber: number;
   status: TableStatus;
   capacity: number;
   currentGuestsNumber?: number;
@@ -13,7 +13,7 @@ export interface CreateTableRequest {
   tableNumber: number | string;
   capacity: number;
   status?: TableStatus;
-  restaurantId: string;
+  restaurantId?: string;
 }
 
 export interface UpdateTableRequest {

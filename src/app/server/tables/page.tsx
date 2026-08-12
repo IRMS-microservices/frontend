@@ -24,21 +24,21 @@ const STATUS_STYLES: Record<
   TableStatus,
   { dot: string; label: string; text: string }
 > = {
-  Available: {
+  AVAILABLE: {
     dot: "bg-green-400",
     label: "AVAILABLE",
     text: "text-green-600",
   },
-  Occupied: { dot: "bg-red-500", label: "OCCUPIED", text: "text-red-600" },
-  Waiting: { dot: "bg-orange-400", label: "WAITING", text: "text-orange-500" },
-  Dirty: { dot: "bg-amber-700", label: "DIRTY", text: "text-amber-800" },
+  OCCUPIED: { dot: "bg-red-500", label: "OCCUPIED", text: "text-red-600" },
+  WAITING: { dot: "bg-orange-400", label: "WAITING", text: "text-orange-500" },
+  DIRTY: { dot: "bg-amber-700", label: "DIRTY", text: "text-amber-800" },
 };
 
 const NUM_STYLES: Record<TableStatus, string> = {
-  Available: "text-[#1a4035]",
-  Occupied: "text-red-400 bg-red-50 rounded-lg px-1",
-  Waiting: "text-orange-500 bg-orange-50 rounded-lg px-1",
-  Dirty: "text-amber-800 bg-amber-50 rounded-lg px-1",
+  AVAILABLE: "text-[#1a4035]",
+  OCCUPIED: "text-red-400 bg-red-50 rounded-lg px-1",
+  WAITING: "text-orange-500 bg-orange-50 rounded-lg px-1",
+  DIRTY: "text-amber-800 bg-amber-50 rounded-lg px-1",
 };
 
 export default function TablesPage() {
@@ -49,35 +49,35 @@ export default function TablesPage() {
     const fetchTablesAndOrders = async () => {
       try {
         const [tableRes, orderRes, customerRes] = await Promise.all([
-          TableService.getTables(),
-          OrderService.getOrders(),
-          CustomerService.getAllCustomers(),
+          TableService.getTables({ limit: 999_999_999 }),
+          OrderService.getOrders({ limit: 999_999_999 }),
+          CustomerService.getAllCustomers({ limit: 999_999_999 }),
         ]);
 
-        const backendTables = tableRes.data;
-        const orders = orderRes.data;
-        const customers = customerRes.data;
+        const backendTables = tableRes.data.data;
+        const orders = orderRes.data.data;
+        const customers = customerRes.data.data;
 
         const dynamicTables: TableData[] = backendTables.map((bt) => {
           const activeOrder = orders?.find(
             (o) =>
-              o.tableId === bt.tableId &&
-              (o.serviceStatus === "Waiting" || o.serviceStatus === "Eating"),
+              o.tableId === bt.tableNumber &&
+              (o.serviceStatus === "WAITING" || o.serviceStatus === "EATING"),
           );
 
-          let status: TableStatus = TableStatus.AVAILABLE;
+          let status: TableStatus = "AVAILABLE";
           switch (bt.status) {
-            case TableStatus.OCCUPIED:
-              status = TableStatus.OCCUPIED;
+            case "OCCUPIED":
+              status = "OCCUPIED";
               break;
-            case TableStatus.WAITING:
-              status = TableStatus.WAITING;
+            case "WAITING":
+              status = "WAITING";
               break;
-            case TableStatus.DIRTY:
-              status = TableStatus.DIRTY;
+            case "DIRTY":
+              status = "DIRTY";
               break;
             default:
-              status = TableStatus.AVAILABLE;
+              status = "AVAILABLE";
           }
 
           const customer = activeOrder
@@ -100,7 +100,9 @@ export default function TablesPage() {
           let localGuestDisplay = null;
           if (!activeOrder && typeof window !== "undefined") {
             try {
-              const saved = localStorage.getItem(`table_guest_${bt.tableId}`);
+              const saved = localStorage.getItem(
+                `table_guest_${bt.tableNumber}`,
+              );
               if (saved) {
                 const lg = JSON.parse(saved);
                 if (lg.name) {
@@ -116,7 +118,7 @@ export default function TablesPage() {
           }
 
           return {
-            id: bt.tableId,
+            id: bt.tableNumber,
             seats: bt.capacity,
             seatedGuests: bt.currentGuestsNumber,
             status: status,
@@ -128,7 +130,7 @@ export default function TablesPage() {
                 : activeOrder
                   ? "Active Order"
                   : "Ready for Service",
-            hasAlert: bt.status === TableStatus.WAITING,
+            hasAlert: bt.status === "WAITING",
           };
         });
 
@@ -143,12 +145,8 @@ export default function TablesPage() {
     fetchTablesAndOrders();
   }, []);
 
-  const emptyCount = tables.filter(
-    (t) => t.status === TableStatus.AVAILABLE,
-  ).length;
-  const waitingCount = tables.filter(
-    (t) => t.status === TableStatus.WAITING,
-  ).length;
+  const emptyCount = tables.filter((t) => t.status === "AVAILABLE").length;
+  const waitingCount = tables.filter((t) => t.status === "WAITING").length;
   const occupiedGuests = tables.reduce(
     (acc, t) => acc + (t.seatedGuests || 0),
     0,
@@ -200,7 +198,7 @@ export default function TablesPage() {
                       </div>
 
                       <div className="flex justify-center my-3">
-                        <div className="w-[88px] h-[88px]">
+                        <div className="w-22 h-22">
                           <TableDiagram
                             capacity={table.seats as 2 | 4 | 6 | 8}
                             guests={table?.seatedGuests!}
@@ -225,7 +223,7 @@ export default function TablesPage() {
           )}
         </div>
 
-        <div className="w-[350px] shrink-0 bg-white border-l border-irms-border p-6">
+        <div className="w-87.5 shrink-0 bg-white border-l border-irms-border p-6">
           <h2 className="text-xs font-bold text-irms-text-muted tracking-widest uppercase mb-5">
             Service Overview
           </h2>
