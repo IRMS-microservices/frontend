@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PaymentAdapterProps } from "./PaymentAdapterRegistry";
 
-export const DefaultAdapterUI: React.FC<PaymentAdapterProps> = ({ order, onSuccess, onCancel }) => {
+export const DefaultAdapterUI: React.FC<PaymentAdapterProps> = ({ order, paymentMethodId, onSuccess, onCancel }) => {
   const [isPolling, setIsPolling] = useState(true);
 
   useEffect(() => {

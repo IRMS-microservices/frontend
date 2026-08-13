@@ -18,7 +18,7 @@ export enum DishCategory {
 }
 
 export interface DishResponse {
-  dishId: number;
+  _id: string;
   restaurantId: string;
   name: string;
   category: DishCategory;
@@ -28,8 +28,8 @@ export interface DishResponse {
 }
 
 export interface OrderItemResponse {
-  itemId: number;
-  dishId: number;
+  _id: number;
+  dishId: string;
   dishName: string;
   quantity: number;
   salePrice: number;
@@ -37,10 +37,10 @@ export interface OrderItemResponse {
 }
 
 export interface OrderResponse {
-  orderId: number;
+  _id: number;
   restaurantId: string;
-  tableId: number;
-  customerId: number | null;
+  tableId: string;
+  customerId: string;
   totalAmount: number;
   paymentStatus: PaymentStatus;
   serviceStatus: ServiceStatus;
@@ -51,14 +51,14 @@ export interface OrderResponse {
 }
 
 export interface OrderItemRequest {
-  dishId: number;
+  dishId: string;
   quantity: number;
   notes?: string;
 }
 
 export interface CreateOrderRequest {
-  tableId: number;
-  customerId: number;
+  tableId: string;
+  customerId: string;
   note?: string;
   items: OrderItemRequest[];
 }

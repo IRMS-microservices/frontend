@@ -24,7 +24,7 @@ type IngredientRow = {
 };
 
 type MenuDraft = {
-  dishId?: number;
+  _id?: number;
   name: string;
   category: DishCategory;
   basePrice: string;
@@ -70,7 +70,7 @@ const defaultIngredients = (category: DishCategory): IngredientRow[] => {
 };
 
 const buildDraftFromDish = (dish: DishResponse): MenuDraft => ({
-  dishId: dish.dishId,
+  _id: dish._id,
   name: dish.name,
   category: dish.category,
   basePrice: String(dish.basePrice),
@@ -130,7 +130,7 @@ export default function AdminMenuPage() {
         setDishes(list);
 
         if (list[0]) {
-          setSelectedDishId(list[0].dishId);
+          setSelectedDishId(list[0]._id);
           setDraft(buildDraftFromDish(list[0]));
         }
       } finally {
@@ -142,7 +142,7 @@ export default function AdminMenuPage() {
   }, []);
 
   const selectedDish = useMemo(
-    () => dishes.find((dish) => dish.dishId === selectedDishId) ?? null,
+    () => dishes.find((dish) => dish._id === selectedDishId) ?? null,
     [dishes, selectedDishId],
   );
 
@@ -188,9 +188,9 @@ export default function AdminMenuPage() {
       };
 
       let saved: DishResponse | null = null;
-      if (draft.dishId) {
+      if (draft._id) {
         const response = await MenuService.updateDish(
-          String(draft.dishId),
+          String(draft._id),
           payload,
         );
         saved = response.success ? (response.data ?? null) : null;
@@ -207,9 +207,9 @@ export default function AdminMenuPage() {
       if (refreshed.success && refreshed.data) {
         const next = refreshed.data.data ?? [];
         setDishes(next);
-        const matched = next.find((dish) => dish.dishId === saved?.dishId);
+        const matched = next.find((dish) => dish._id === saved?._id);
         if (matched) {
-          setSelectedDishId(matched.dishId);
+          setSelectedDishId(matched._id);
         }
       }
       setFeedback("Changes saved.");
@@ -232,14 +232,14 @@ export default function AdminMenuPage() {
   };
 
   const deleteDish = async () => {
-    if (!draft.dishId) {
+    if (!draft._id) {
       return;
     }
 
     setIsDeleting(true);
     setFeedback(null);
     try {
-      const response = await MenuService.deleteDish(String(draft.dishId));
+      const response = await MenuService.deleteDish(String(draft._id));
       if (!response.success) {
         throw new Error(response.message || "Failed to delete dish.");
       }
@@ -248,7 +248,7 @@ export default function AdminMenuPage() {
       if (refreshed.success && refreshed.data) {
         const next = refreshed.data.data ?? [];
         setDishes(next);
-        setSelectedDishId(next[0]?.dishId ?? null);
+        setSelectedDishId(next[0]?._id ?? null);
         setDraft(next[0] ? buildDraftFromDish(next[0]) : buildBlankDraft());
       }
 
@@ -363,12 +363,12 @@ export default function AdminMenuPage() {
               ) : (
                 <div className="grid gap-5 lg:grid-cols-2">
                   {filteredDishes.map((dish) => {
-                    const selected = selectedDishId === dish.dishId;
+                    const selected = selectedDishId === dish._id;
                     return (
                       <button
-                        key={dish.dishId}
+                        key={dish._id}
                         type="button"
-                        onClick={() => setSelectedDishId(dish.dishId)}
+                        onClick={() => setSelectedDishId(dish._id)}
                         className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
                           selected
                             ? "border-irms-green shadow-lg ring-4 ring-emerald-100"
@@ -397,7 +397,7 @@ export default function AdminMenuPage() {
                                   event.stopPropagation();
                                   const nextAvailable = !dish.available;
                                   const response = await MenuService.updateDish(
-                                    String(dish.dishId),
+                                    String(dish._id),
                                     {
                                       available: nextAvailable,
                                     },
@@ -405,7 +405,7 @@ export default function AdminMenuPage() {
                                   if (response.success) {
                                     setDishes((current) =>
                                       current.map((item) =>
-                                        item.dishId === dish.dishId
+                                        item._id === dish._id
                                           ? {
                                               ...item,
                                               available: nextAvailable,
@@ -413,7 +413,7 @@ export default function AdminMenuPage() {
                                           : item,
                                       ),
                                     );
-                                    if (selectedDishId === dish.dishId) {
+                                    if (selectedDishId === dish._id) {
                                       setDraft((current) => ({
                                         ...current,
                                         available: nextAvailable,
@@ -728,7 +728,7 @@ export default function AdminMenuPage() {
                     </div>
 
                     <div className="flex gap-3">
-                      {draft.dishId && (
+                      {draft._id && (
                         <button
                           type="button"
                           onClick={deleteDish}

@@ -13,7 +13,7 @@ import { DishCategory, DishResponse } from "@/types/menuOrder.types";
 type Category = "APPETIZERS" | "MAIN_COURSE" | "DRINKS" | "DESSERTS";
 
 interface MenuItem {
-  id: number;
+  id: string;
   name: string;
   description?: string;
   price: number;
@@ -55,7 +55,7 @@ export default function OrderPage({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orderNotes, setOrderNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [customerId, setCustomerId] = useState<string | null>("0");
 
   // Load from localStorage
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function OrderPage({
 
         dishes.forEach((dish) => {
           grouped[dish.category as Category].push({
-            id: dish.dishId,
+            id: dish._id,
             name: dish.name,
             price: dish.basePrice,
             status: dish.available ? "IN STOCK" : "SOLD OUT",
@@ -142,7 +142,7 @@ export default function OrderPage({
     });
   };
 
-  const removeFromCart = (itemId: number) => {
+  const removeFromCart = (itemId: string) => {
     setCart((prev) => prev.filter((c) => c.item.id !== itemId));
   };
 
@@ -166,11 +166,11 @@ export default function OrderPage({
     setIsSubmitting(true);
     try {
       await OrderService.createOrder({
-        tableId: parseInt(tableId),
-        customerId: customerId || 1,
+        tableId: tableId,
+        customerId: customerId || "0",
         note: orderNotes,
         items: cart.map((c) => ({
-          dishId: c.item.originalDish.dishId,
+          dishId: c.item.originalDish._id,
           quantity: c.quantity,
         })),
       });

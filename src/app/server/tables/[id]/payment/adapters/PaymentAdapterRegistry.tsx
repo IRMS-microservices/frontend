@@ -6,6 +6,7 @@ import { CashAdapterUI } from "./CashAdapterUI";
 
 export interface PaymentAdapterProps {
   order: OrderResponse;
+  paymentMethodId: string;
   onSuccess: () => void;
   onCancel: () => void;
 }

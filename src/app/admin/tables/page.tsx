@@ -34,11 +34,12 @@ export default function AdminTablesPage() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createTableNumber, setCreateTableNumber] = useState("");
+  const [createTableNumber, setCreateTableNumber] = useState(0);
   const [createTableCapacity, setCreateTableCapacity] =
     useState<SupportedCapacity>(4);
-  const [createTableStatus, setCreateTableStatus] =
-    useState<TableStatus>("AVAILABLE");
+  const [createTableStatus, setCreateTableStatus] = useState<TableStatus>(
+    TableStatus.AVAILABLE,
+  );
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
   const [tableActionError, setTableActionError] = useState<string | null>(null);
 
@@ -147,9 +148,7 @@ export default function AdminTablesPage() {
     setTableActionError(null);
     try {
       const response = await TableService.createTable({
-        tableNumber:
-          createTableNumber ||
-          `T-${String(tables.length + 1).padStart(2, "0")}`,
+        tableNumber: createTableNumber || tables.length + 1,
         capacity: createTableCapacity,
         status: createTableStatus,
       });
@@ -159,9 +158,9 @@ export default function AdminTablesPage() {
       }
 
       setIsCreateOpen(false);
-      setCreateTableNumber("");
+      setCreateTableNumber(0);
       setCreateTableCapacity(4);
-      setCreateTableStatus("AVAILABLE");
+      setCreateTableStatus(TableStatus.AVAILABLE);
       await loadTables(response.data._id);
     } catch (error) {
       setTableActionError(
@@ -461,7 +460,9 @@ export default function AdminTablesPage() {
                 </span>
                 <input
                   value={createTableNumber}
-                  onChange={(event) => setCreateTableNumber(event.target.value)}
+                  onChange={(event) =>
+                    setCreateTableNumber(Number(event.target.value))
+                  }
                   className="rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-irms-green focus:ring-2 focus:ring-irms-green/15"
                   placeholder="04"
                 />

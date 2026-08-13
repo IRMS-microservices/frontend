@@ -1,6 +1,6 @@
 import { PaymentAdapterProps } from "./PaymentAdapterRegistry";
 
-export const CashAdapterUI: React.FC<PaymentAdapterProps> = ({ order, onSuccess, onCancel }) => {
+export const CashAdapterUI: React.FC<PaymentAdapterProps> = ({ order, paymentMethodId, onSuccess, onCancel }) => {
   return (
     <div className="flex flex-col items-center justify-center p-6 bg-white rounded-xl">
       <h3 className="text-xl font-bold mb-4 text-irms-text-primary">Cash Payment</h3>

@@ -13,9 +13,9 @@ import {
 import { ServiceStatus } from "@/types/menuOrder.types";
 
 interface Ticket {
-  kitchenOrderId: number;
-  orderId: number;
-  tableId: number;
+  kitchenOrderId: string;
+  orderId: string;
+  tableId: string;
   fireTime: string;
   items: KitchenOrderItemResponse[];
 }
@@ -23,13 +23,13 @@ interface Ticket {
 export default function ExpeditorViewPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [bumpingIds, setBumpingIds] = useState<Set<number>>(new Set());
+  const [bumpingIds, setBumpingIds] = useState<Set<string>>(new Set());
 
   // orderId → tableId lookup
-  const orderIdToTableIdRef = useRef<Map<number, number>>(new Map());
+  const orderIdToTableIdRef = useRef<Map<string, string>>(new Map());
 
   const buildTicket = useCallback(
-    (ko: KitchenOrderResponse, tableId: number): Ticket => ({
+    (ko: KitchenOrderResponse, tableId: string): Ticket => ({
       kitchenOrderId: ko._id,
       orderId: ko.orderId,
       tableId,
@@ -57,8 +57,8 @@ export default function ExpeditorViewPage() {
       const kitchenOrders: KitchenOrderResponse[] = kitchenRes.data.data ?? [];
       const waitingOrders = ordersRes.data.data ?? [];
 
-      const tableMap = new Map<number, number>(
-        waitingOrders.map((o) => [o.orderId, o.tableId]),
+      const tableMap = new Map<string, string>(
+        waitingOrders.map((o: any) => [o.orderId, o.tableId] as [string, string]),
       );
       orderIdToTableIdRef.current = tableMap;
 
@@ -101,7 +101,7 @@ export default function ExpeditorViewPage() {
               String(newOrder.orderId),
             );
             if (res.data) {
-              tableId = Number(res.data.tableId);
+              tableId = String(res.data.tableId);
               orderIdToTableIdRef.current.set(newOrder.orderId, tableId);
             }
           } catch (err) {

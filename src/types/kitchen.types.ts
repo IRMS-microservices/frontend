@@ -17,8 +17,8 @@ export enum SocketEventTypes {
 }
 
 export interface KitchenOrderItemResponse {
-    _id: number;
-    dishId: number;
+    _id: string;
+    dishId: string;
     restaurantId: string;
     dishName: string;
     quantity: number;
@@ -29,8 +29,8 @@ export interface KitchenOrderItemResponse {
 }
 
 export interface KitchenOrderResponse {
-    _id: number;
-    orderId: number;
+    _id: string;
+    orderId: string;
     status: KitchenOrderStatus;
     fireTime: string;
     items: KitchenOrderItemResponse[];

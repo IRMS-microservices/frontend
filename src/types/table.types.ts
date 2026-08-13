@@ -1,4 +1,9 @@
-export type TableStatus = 'AVAILABLE' | 'OCCUPIED' | 'DIRTY' | 'WAITING';
+export enum TableStatus {
+  AVAILABLE = 'AVAILABLE',
+  OCCUPIED = 'OCCUPIED',
+  DIRTY = 'DIRTY',
+  WAITING = 'WAITING',
+}
 
 export interface TableResponse {
   _id: string;
@@ -10,7 +15,7 @@ export interface TableResponse {
 }
 
 export interface CreateTableRequest {
-  tableNumber: number | string;
+  tableNumber: number;
   capacity: number;
   status?: TableStatus;
   restaurantId?: string;
@@ -20,10 +25,12 @@ export interface UpdateTableRequest {
   tableNumber?: number | string;
   capacity?: number;
   status?: TableStatus;
+  currentGuestsNumber?: number;
+  customerId?: string;
 }
 
 export interface TableQuery {
-  tableNumber?: number | string;
+  tableNumber?: number;
   status?: TableStatus;
   minCapacity?: number;
   maxCapacity?: number;
@@ -33,7 +40,7 @@ export interface TableQuery {
 }
 
 export interface AssignTableRequest {
-  customerId?: number;
+  customerId?: string;
   guestsNumber: number;
   name?: string;
   phone?: string;

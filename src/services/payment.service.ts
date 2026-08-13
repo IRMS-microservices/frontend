@@ -6,8 +6,10 @@ import {
   PaymentCredentialsRequest,
   PaymentCredentialsResponse,
   PaymentGatewayResponse,
+  PaymentGatewayQueryResponse,
   PaymentMethodRequest,
   PaymentMethodResponse,
+  QueryPaymentOrderRequest,
   UpdatePaymentCredentialsRequest,
 } from '../types/payment.types';
 
@@ -166,6 +168,14 @@ export const PaymentService = {
    */
   createPaymentOrder: async (request: CreatePaymentOrderRequest): Promise<ApiResponse<PaymentGatewayResponse>> => {
     const response = await apiClient.post<ApiResponse<PaymentGatewayResponse>>('/api/payments/create-order', request);
+    return response.data;
+  },
+
+  /**
+   * POST /api/payments/query-order
+   */
+  queryPaymentOrder: async (request: QueryPaymentOrderRequest): Promise<ApiResponse<PaymentGatewayQueryResponse>> => {
+    const response = await apiClient.post<ApiResponse<PaymentGatewayQueryResponse>>('/api/payments/query-order', request);
     return response.data;
   },
 };

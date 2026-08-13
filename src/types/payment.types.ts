@@ -86,6 +86,23 @@ export interface PaymentGatewayResponse {
   rawResponse: unknown;
 }
 
+export interface PaymentGatewayQueryRequest {
+  transactionId: string;
+}
+
+export interface QueryPaymentOrderRequest extends PaymentGatewayQueryRequest {
+  paymentMethodId: string;
+  restaurantId: string;
+}
+
+export interface PaymentGatewayQueryResponse {
+  success: boolean;
+  isProcessing: boolean;
+  isPaid: boolean;
+  amount?: number;
+  rawResponse: unknown;
+}
+
 export interface PaymentCredentialsQuery {
   paymentMethodId?: string;
   restaurantId?: string;

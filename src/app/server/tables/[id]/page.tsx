@@ -8,7 +8,7 @@ import TableDiagram from "@/components/app/table/TableDiagram";
 import AssignGuestModal from "@/components/app/table/AssignGuestModal";
 import { CustomerInfoModal } from "@/components/app/table/CustomerInfoModal";
 import { OrderService } from "@/services/order.service";
-import { OrderResponse } from "@/types/menuOrder.types";
+import { OrderResponse, ServiceStatus } from "@/types/menuOrder.types";
 import { TableService } from "@/services/table.service";
 import { CustomerService } from "@/services/customer.service";
 import { TableResponse, TableStatus } from "@/types/table.types";
@@ -111,16 +111,18 @@ export default function TableDetailPage({
       setGuest(null); // ← reset guest before each fetch so the !guest guard doesn't block
       try {
         const [tableRes, ordersRes] = await Promise.all([
-          TableService.getTable(parseInt(tableId)),
-          OrderService.getOrders(parseInt(tableId)),
+          TableService.getTable(tableId),
+          OrderService.getOrders({ tableId }),
         ]);
 
         const tableData = tableRes.data;
         setTableInfo(tableData);
 
         const orders = ordersRes.data;
-        const currentActiveOrder = orders?.find(
-          (o) => o.serviceStatus === "Waiting" || o.serviceStatus === "Eating",
+        const currentActiveOrder = orders?.data.find(
+          (o) =>
+            o.serviceStatus === ServiceStatus.WAITING ||
+            o.serviceStatus === ServiceStatus.EATING,
         );
 
         let customerData = null;
@@ -185,14 +187,14 @@ export default function TableDetailPage({
   const handleConfirmAssign = async (g: GuestInfo) => {
     try {
       // 1. Create customer first to get real customerId
-      let customerId: number | undefined;
+      let customerId: string | undefined;
       try {
         const customerRes = await CustomerService.createCustomer({
           name: g.name,
           gender: g.gender,
           phone: g.phone,
         });
-        customerId = customerRes.data.customerId;
+        customerId = customerRes.data._id;
 
         // Save to localStorage immediately
         localStorage.setItem(
@@ -208,11 +210,9 @@ export default function TableDetailPage({
       }
 
       // 2. Assign table with customer info
-      await TableService.assignTable(parseInt(tableId), {
-        guestsNumber: g.partySize,
-        name: g.name,
-        phone: g.phone,
-        gender: g.gender,
+      await TableService.updateTable(tableId, {
+        status: TableStatus.OCCUPIED,
+        currentGuestsNumber: g.partySize,
         customerId: customerId,
       });
 
@@ -228,13 +228,14 @@ export default function TableDetailPage({
   // Clear table button — replace the inline onClick
   const handleClearTable = async () => {
     try {
-      await TableService.updateTableStatus(
-        parseInt(tableId),
-        TableStatus.AVAILABLE,
-      );
+      await TableService.updateTable(tableId, {
+        status: TableStatus.AVAILABLE,
+        currentGuestsNumber: 0,
+        customerId: undefined,
+      });
 
       // Refresh table info
-      const tableRes = await TableService.getTable(parseInt(tableId));
+      const tableRes = await TableService.getTable(tableId);
       setTableInfo(tableRes.data);
 
       localStorage.removeItem(`table_guest_${tableId}`);
@@ -295,7 +296,7 @@ export default function TableDetailPage({
           </p>
 
           {/* State card */}
-          <div className="bg-white rounded-2xl border border-irms-border flex flex-col items-center justify-center py-16 px-8 text-center min-h-[400px]">
+          <div className="bg-white rounded-2xl border border-irms-border flex flex-col items-center justify-center py-16 px-8 text-center min-h-100">
             {isLoading ? (
               <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-4 border-irms-green/20 border-t-irms-green rounded-full animate-spin" />
@@ -413,7 +414,7 @@ export default function TableDetailPage({
         </div>
 
         {/* Right attributes sidebar */}
-        <div className="w-[280px] shrink-0 p-6 space-y-4">
+        <div className="w-70 shrink-0 p-6 space-y-4">
           <div className="bg-white rounded-xl border border-irms-border p-5">
             <h3 className="text-xs font-bold text-irms-text-muted tracking-widest uppercase mb-4">
               Table Attributes

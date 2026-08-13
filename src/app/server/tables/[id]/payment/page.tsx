@@ -15,6 +15,7 @@ import { PaymentService } from "@/services/payment.service";
 import { getPaymentAdapterUI } from "./adapters/PaymentAdapterRegistry";
 
 type PaymentMethodItem = {
+  id: string;
   code: string;
   name: string;
   logo: string;
@@ -66,13 +67,14 @@ export default function PaymentPage({
   const tableId = resolvedParams.id;
   const router = useRouter();
 
-  const [paymentMethodCode, setPaymentMethodCode] = useState<string>("CASH");
+  const [selectedMethod, setSelectedMethod] =
+    useState<PaymentMethodItem | null>(null);
   const [supportedMethods, setSupportedMethods] = useState<PaymentMethodItem[]>(
     [],
   );
   const [showPopup, setShowPopup] = useState(false);
   const [activeOrder, setActiveOrder] = useState<OrderResponse | null>(null);
-  const [displayCustomerId, setDisplayCustomerId] = useState<number | null>(
+  const [displayCustomerId, setDisplayCustomerId] = useState<string | null>(
     null,
   );
   const [customerName, setCustomerName] = useState<string | null>(null);
@@ -147,6 +149,7 @@ export default function PaymentPage({
         ]);
 
         const CASH_METHOD: PaymentMethodItem = {
+          id: "cash-id",
           code: "CASH",
           name: "CASH",
           logo: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>`,
@@ -163,6 +166,7 @@ export default function PaymentPage({
               );
               if (method && method.isActive) {
                 return {
+                  id: method._id,
                   code: method.code,
                   name: method.name,
                   logo: method.logo,
@@ -173,13 +177,16 @@ export default function PaymentPage({
             .filter(Boolean) as PaymentMethodItem[];
 
           setSupportedMethods([CASH_METHOD, ...supported]);
+          if (!selectedMethod) setSelectedMethod(CASH_METHOD);
         } else {
           setSupportedMethods([CASH_METHOD]);
+          if (!selectedMethod) setSelectedMethod(CASH_METHOD);
         }
       } catch (err) {
         console.error("Failed to fetch payment methods", err);
         setSupportedMethods([
           {
+            id: "cash",
             code: "CASH",
             name: "CASH",
             logo: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>`,
@@ -197,10 +204,10 @@ export default function PaymentPage({
     const unsubscribe = OrderService.onOrderServiceStatusChanged(
       (updatedOrder: OrderResponse) => {
         // Only update if it's for the current table
-        if (updatedOrder.tableId !== parseInt(tableId)) return;
+        if (updatedOrder.tableId !== tableId) return;
 
         setActiveOrder((prev) => {
-          if (prev && prev.orderId === updatedOrder.orderId) {
+          if (prev && prev._id === updatedOrder._id) {
             return { ...prev, ...updatedOrder };
           }
           // If no active order yet, pick up this one if it's in a relevant status
@@ -243,7 +250,7 @@ export default function PaymentPage({
     setIsProcessing(true);
     setShowPopup(false);
     try {
-      await OrderService.updateOrder(activeOrder.orderId.toString(), {
+      await OrderService.updateOrder(activeOrder._id.toString(), {
         serviceStatus: ServiceStatus.FINISHED,
         paymentStatus: PaymentStatus.PAID,
       });
@@ -260,7 +267,9 @@ export default function PaymentPage({
     setShowPopup(false);
   };
 
-  const PaymentPopupComponent = getPaymentAdapterUI(paymentMethodCode);
+  const PaymentPopupComponent = selectedMethod
+    ? getPaymentAdapterUI(selectedMethod.code)
+    : null;
 
   return (
     <div className="flex flex-col h-full">
@@ -316,7 +325,7 @@ export default function PaymentPage({
             <div className="bg-white rounded-2xl border border-irms-border p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-bold text-irms-text-primary">
-                  Order Details (ID: #{activeOrder.orderId})
+                  Order Details (ID: #{activeOrder._id})
                 </h3>
                 <span className="text-xs font-bold text-irms-text-muted tracking-widest">
                   {activeOrder.items.reduce((s, i) => s + i.quantity, 0)} ITEMS
@@ -332,7 +341,7 @@ export default function PaymentPage({
                       : ServiceStatus.FINISHED;
                   return (
                     <div
-                      key={item.itemId}
+                      key={item._id}
                       className="flex items-center gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0"
                     >
                       <div className="w-8 h-8 rounded-lg bg-irms-bg-secondary flex items-center justify-center text-sm font-bold text-irms-text-primary shrink-0">
@@ -474,10 +483,10 @@ export default function PaymentPage({
             {supportedMethods.map((m) => (
               <button
                 key={m.code}
-                onClick={() => setPaymentMethodCode(m.code)}
+                onClick={() => setSelectedMethod(m)}
                 disabled={!activeOrder}
                 className={`flex flex-col items-center gap-1.5 py-3 rounded-lg border-2 text-xs font-bold tracking-wider transition-all cursor-pointer ${
-                  paymentMethodCode === m.code
+                  selectedMethod?.code === m.code
                     ? "bg-white border-irms-green text-irms-green"
                     : "bg-irms-bg-secondary border-irms-border text-irms-text-muted hover:border-irms-green/40"
                 } ${!activeOrder ? "opacity-50 cursor-not-allowed" : ""}`}
@@ -544,7 +553,7 @@ export default function PaymentPage({
       </div>
 
       {/* Payment Popup */}
-      {showPopup && activeOrder && (
+      {showPopup && activeOrder && selectedMethod && PaymentPopupComponent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden relative border border-gray-100">
             <button
@@ -567,6 +576,7 @@ export default function PaymentPage({
             </button>
             <PaymentPopupComponent
               order={activeOrder}
+              paymentMethodId={selectedMethod.id}
               onSuccess={handlePaymentSuccess}
               onCancel={handlePaymentCancel}
             />

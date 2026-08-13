@@ -61,27 +61,27 @@ export default function TablesPage() {
         const dynamicTables: TableData[] = backendTables.map((bt) => {
           const activeOrder = orders?.find(
             (o) =>
-              o.tableId === bt.tableNumber &&
+              o.tableId === bt._id &&
               (o.serviceStatus === "WAITING" || o.serviceStatus === "EATING"),
           );
 
-          let status: TableStatus = "AVAILABLE";
+          let status = TableStatus.AVAILABLE;
           switch (bt.status) {
-            case "OCCUPIED":
-              status = "OCCUPIED";
+            case TableStatus.OCCUPIED:
+              status = TableStatus.OCCUPIED;
               break;
-            case "WAITING":
-              status = "WAITING";
+            case TableStatus.WAITING:
+              status = TableStatus.WAITING;
               break;
-            case "DIRTY":
-              status = "DIRTY";
+            case TableStatus.DIRTY:
+              status = TableStatus.DIRTY;
               break;
             default:
-              status = "AVAILABLE";
+              status = TableStatus.AVAILABLE;
           }
 
           const customer = activeOrder
-            ? customers?.find((c) => c.customerId === activeOrder.customerId)
+            ? customers?.find((c) => c._id === activeOrder.customerId)
             : null;
 
           const customerDisplay =
