@@ -50,11 +50,11 @@ export interface KitchenOrderQuery {
 }
 
 export interface UpdateKitchenOrderItemRequest {
-    cookingStatus: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    cookingStatus: CookingStatus;
     notes?: string;
 }
 
 export interface UpdateKitchenOrderRequest {
-    status?: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+    status?: KitchenOrderStatus;
     [key: string]: unknown;
 }

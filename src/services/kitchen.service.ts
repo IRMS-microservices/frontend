@@ -189,4 +189,20 @@ export const KitchenService = {
         s.on('joined', callback);
         return () => s.off('joined', callback);
     },
+
+    /**
+     * Emit bump kitchen item event via Socket.IO
+     */
+    bumpItem(kitchenItemId: string, updateData: any): void {
+        const s = getKitchenSocket();
+        s.emit('bump_kitchen_item', { id: kitchenItemId, update: updateData });
+    },
+
+    /**
+     * Emit bump kitchen order event via Socket.IO
+     */
+    bumpOrder(kitchenOrderId: string, updateData: any): void {
+        const s = getKitchenSocket();
+        s.emit('bump_kitchen_order', { id: kitchenOrderId, update: updateData });
+    },
 };

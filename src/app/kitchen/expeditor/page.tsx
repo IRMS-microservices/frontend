@@ -10,6 +10,7 @@ import {
   CookingStatus,
   KitchenOrderStatus,
 } from "@/types/kitchen.types";
+import { ServiceStatus } from "@/types/menuOrder.types";
 
 interface Ticket {
   kitchenOrderId: number;
@@ -151,14 +152,11 @@ export default function ExpeditorViewPage() {
     if (bumpingIds.has(ticket.kitchenOrderId)) return;
     setBumpingIds((prev) => new Set(prev).add(ticket.kitchenOrderId));
     try {
-      await Promise.all([
-        KitchenService.updateOrder(String(ticket.kitchenOrderId), {
-          status: "COMPLETED",
-        }),
-        OrderService.updateOrder(String(ticket.orderId), {
-          serviceStatus: "CONFIRMED",
-        }),
-      ]);
+      // Send socket event to bump kitchen order
+      // We use SERVED to trigger the backend RabbitMQ pipeline to order-payment-service
+      KitchenService.bumpOrder(String(ticket.kitchenOrderId), {
+        status: KitchenOrderStatus.SERVED,
+      });
       setTickets((prev) =>
         prev.filter((t) => t.kitchenOrderId !== ticket.kitchenOrderId),
       );

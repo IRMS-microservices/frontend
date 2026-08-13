@@ -32,7 +32,7 @@ export function PinModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-md">
-      <div className="relative w-full max-w-lg rounded-[2rem] bg-white px-8 py-10 text-center shadow-2xl shadow-slate-950/20">
+      <div className="relative w-full max-w-lg rounded-4xl bg-white px-8 py-10 text-center shadow-2xl shadow-slate-950/20">
         <button
           type="button"
           onClick={onClose}
@@ -46,13 +46,17 @@ export function PinModal({
         </div>
 
         <h2 className="text-2xl font-bold text-irms-text-primary">{title}</h2>
-        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-500">{description}</p>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-500">
+          {description}
+        </p>
 
         <div className="mt-8 flex justify-center">
           <PinCodeInput value={value} onChange={onChange} autoFocus />
         </div>
 
-        {error && <p className="mt-4 text-sm font-medium text-red-600">{error}</p>}
+        {error && (
+          <p className="mt-4 text-sm font-medium text-red-600">{error}</p>
+        )}
 
         <button
           type="button"

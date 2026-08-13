@@ -5,8 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthService } from "@/services/auth.service";
 import { IrmsLogo } from "@/components/shared/IrmsLogo";
-
-type Station = "ADMIN" | "SERVER" | "KITCHEN";
+import { UserRole } from "@/types/user.types";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,11 +23,11 @@ export default function LoginPage() {
     try {
       const response = await AuthService.login({ username, password });
       if (response.success) {
-        if (response.data?.role === "ADMIN") {
+        if (response.data?.role === UserRole.ADMIN) {
           router.push("/admin/dashboard");
-        } else if (response.data?.role === "KITCHEN_STAFF") {
+        } else if (response.data?.role === UserRole.KITCHEN) {
           router.push("/kitchen/expeditor");
-        } else if (response.data?.role === "SERVER") {
+        } else if (response.data?.role === UserRole.SERVER) {
           router.push("/server/tables");
         }
       } else {
@@ -47,7 +46,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-irms-green relative overflow-hidden">
       {/* Background radial gradient */}
       <div className="absolute inset-0 bg-linear-to-br from-irms-green-light via-irms-green to-irms-green-dark opacity-90" />
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-irms-green-light rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
+      <div className="absolute top-0 right-0 w-150 h-150 bg-irms-green-light rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
 
       {/* Card */}
       <div

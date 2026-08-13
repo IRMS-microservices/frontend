@@ -1,3 +1,10 @@
+export enum UserRole {
+  SERVER = 'SERVER',
+  ADMIN = 'ADMIN',
+  KITCHEN = 'KITCHEN',
+  SYSADMIN = 'SYSADMIN'
+}
+
 export interface UserResponse {
   _id: string;
   username: string;
@@ -10,7 +17,7 @@ export interface UserResponse {
 
 export interface CreateUserRequest {
   fullName: string;
-  role: 'SERVER' | 'ADMIN' | 'KITCHEN';
+  role: UserRole;
   phoneNumber: string;
   username: string;
   password: string;
@@ -19,12 +26,12 @@ export interface CreateUserRequest {
 export interface UpdateUserRequest {
   fullName?: string;
   phoneNumber?: string;
-  role?: 'SERVER' | 'ADMIN' | 'KITCHEN';
+  role?: UserRole;
   password?: string;
 }
 
 export interface UserListQuery {
-  role?: 'SERVER' | 'ADMIN' | 'KITCHEN';
+  role?: UserRole;
   search?: string;
   page?: number;
   limit?: number;

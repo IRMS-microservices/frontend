@@ -11,8 +11,14 @@ import {
   ServiceStatus,
 } from "@/types/menuOrder.types";
 import { CustomerService } from "@/services/customer.service";
+import { PaymentService } from "@/services/payment.service";
+import { getPaymentAdapterUI } from "./adapters/PaymentAdapterRegistry";
 
-type PaymentMethod = "CREDIT CARD" | "QR CODE" | "CASH" | "DIGITAL WALLET";
+type PaymentMethodItem = {
+  code: string;
+  name: string;
+  logo: string;
+};
 
 const STATUS_STYLES: Record<string, string> = {
   SERVED: "text-green-600",
@@ -60,8 +66,11 @@ export default function PaymentPage({
   const tableId = resolvedParams.id;
   const router = useRouter();
 
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethod>("CREDIT CARD");
+  const [paymentMethodCode, setPaymentMethodCode] = useState<string>("CASH");
+  const [supportedMethods, setSupportedMethods] = useState<PaymentMethodItem[]>(
+    [],
+  );
+  const [showPopup, setShowPopup] = useState(false);
   const [activeOrder, setActiveOrder] = useState<OrderResponse | null>(null);
   const [displayCustomerId, setDisplayCustomerId] = useState<number | null>(
     null,
@@ -73,11 +82,11 @@ export default function PaymentPage({
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        const response = await OrderService.getOrders(parseInt(tableId));
+        const response = await OrderService.getOrders({ tableId });
         const orders = response.data;
         // Find active order (Waiting or Eating)
-        const currentActiveOrder = orders?.find(
-          (o) => o.serviceStatus === "Waiting" || o.serviceStatus === "Eating",
+        const currentActiveOrder = orders?.data?.find(
+          (o) => o.serviceStatus === "WAITING" || o.serviceStatus === "EATING",
         );
         setActiveOrder(currentActiveOrder || null);
         setLoading(false);
@@ -108,7 +117,9 @@ export default function PaymentPage({
 
       if (cid) {
         try {
-          const response = await CustomerService.getCustomerById(cid);
+          const response = await CustomerService.getCustomerById(
+            cid.toString(),
+          );
           if (response.success) {
             const customerData = response.data;
             const formattedName =
@@ -127,6 +138,58 @@ export default function PaymentPage({
     fetchCustomer();
   }, [activeOrder, tableId]);
 
+  useEffect(() => {
+    const fetchMethods = async () => {
+      try {
+        const [credsRes, methodsRes] = await Promise.all([
+          PaymentService.getPaymentCredentials(),
+          PaymentService.getPaymentMethods(),
+        ]);
+
+        const CASH_METHOD: PaymentMethodItem = {
+          code: "CASH",
+          name: "CASH",
+          logo: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>`,
+        };
+
+        if (credsRes.success && methodsRes.success) {
+          const creds = credsRes.data;
+          const methods = methodsRes.data;
+
+          const supported = creds
+            .map((cred) => {
+              const method = methods.find(
+                (m) => m._id === cred.paymentMethodId,
+              );
+              if (method && method.isActive) {
+                return {
+                  code: method.code,
+                  name: method.name,
+                  logo: method.logo,
+                };
+              }
+              return null;
+            })
+            .filter(Boolean) as PaymentMethodItem[];
+
+          setSupportedMethods([CASH_METHOD, ...supported]);
+        } else {
+          setSupportedMethods([CASH_METHOD]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch payment methods", err);
+        setSupportedMethods([
+          {
+            code: "CASH",
+            name: "CASH",
+            logo: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>`,
+          },
+        ]);
+      }
+    };
+    fetchMethods();
+  }, []);
+
   // ── Real-time: listen for service-status changes from the kitchen ──
   useEffect(() => {
     OrderService.connect();
@@ -143,8 +206,8 @@ export default function PaymentPage({
           // If no active order yet, pick up this one if it's in a relevant status
           if (
             !prev &&
-            (updatedOrder.serviceStatus === "Waiting" ||
-              updatedOrder.serviceStatus === "Eating")
+            (updatedOrder.serviceStatus === ServiceStatus.WAITING ||
+              updatedOrder.serviceStatus === ServiceStatus.FINISHED)
           ) {
             return updatedOrder;
           }
@@ -170,12 +233,20 @@ export default function PaymentPage({
   const tax = subtotal * 0.08;
   const grandTotal = subtotal + serviceCharge + tax;
 
-  const handlePayment = async () => {
+  const handleCompletePaymentClick = () => {
+    if (!activeOrder) return;
+    setShowPopup(true);
+  };
+
+  const handlePaymentSuccess = async () => {
     if (!activeOrder) return;
     setIsProcessing(true);
+    setShowPopup(false);
     try {
-      await OrderService.updateServiceStatus(activeOrder.orderId, "Finished");
-      await OrderService.updatePaymentStatus(activeOrder.orderId, "Paid");
+      await OrderService.updateOrder(activeOrder.orderId.toString(), {
+        serviceStatus: ServiceStatus.FINISHED,
+        paymentStatus: PaymentStatus.PAID,
+      });
       router.push(`/server/tables/${tableId}`);
     } catch (err) {
       console.error("Payment failed", err);
@@ -185,89 +256,11 @@ export default function PaymentPage({
     }
   };
 
-  const PAYMENT_METHODS: { label: PaymentMethod; icon: JSX.Element }[] = [
-    {
-      label: "CREDIT CARD",
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-          <line x1="1" y1="10" x2="23" y2="10" />
-        </svg>
-      ),
-    },
-    {
-      label: "QR CODE",
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="3" y="3" width="5" height="5" />
-          <rect x="16" y="3" width="5" height="5" />
-          <rect x="3" y="16" width="5" height="5" />
-          <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
-          <line x1="21" y1="21" x2="21" y2="21" />
-          <path d="M3.03 14H5" />
-          <path d="M9 13v2" />
-          <path d="M11 11h2v2" />
-          <path d="M14 11h1" />
-        </svg>
-      ),
-    },
-    {
-      label: "CASH",
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="2" y="6" width="20" height="12" rx="2" />
-          <circle cx="12" cy="12" r="2" />
-          <path d="M6 12h.01M18 12h.01" />
-        </svg>
-      ),
-    },
-    {
-      label: "DIGITAL WALLET",
-      icon: (
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
-          <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
-          <path d="M18 12a2 2 0 0 0 0 4h4v-4z" />
-        </svg>
-      ),
-    },
-  ];
+  const handlePaymentCancel = () => {
+    setShowPopup(false);
+  };
+
+  const PaymentPopupComponent = getPaymentAdapterUI(paymentMethodCode);
 
   return (
     <div className="flex flex-col h-full">
@@ -334,9 +327,9 @@ export default function PaymentPage({
               <div className="space-y-4">
                 {activeOrder.items.map((item, idx) => {
                   const itemStatus =
-                    activeOrder.serviceStatus === "Waiting"
-                      ? "WAITING"
-                      : "SERVED";
+                    activeOrder.serviceStatus === ServiceStatus.WAITING
+                      ? ServiceStatus.WAITING
+                      : ServiceStatus.FINISHED;
                   return (
                     <div
                       key={item.itemId}
@@ -384,7 +377,7 @@ export default function PaymentPage({
         </div>
 
         {/* Right — payment summary */}
-        <div className="w-[350px] shrink-0 bg-white border-l border-irms-border flex flex-col p-6 overflow-y-auto">
+        <div className="w-87.5 shrink-0 bg-white border-l border-irms-border flex flex-col p-6 overflow-y-auto">
           {/* Action buttons */}
           <div className="flex gap-3 mb-6">
             <button
@@ -478,26 +471,39 @@ export default function PaymentPage({
             Payment Method
           </p>
           <div className="grid grid-cols-2 gap-2 mb-6">
-            {PAYMENT_METHODS.map((m) => (
+            {supportedMethods.map((m) => (
               <button
-                key={m.label}
-                onClick={() => setPaymentMethod(m.label)}
+                key={m.code}
+                onClick={() => setPaymentMethodCode(m.code)}
                 disabled={!activeOrder}
                 className={`flex flex-col items-center gap-1.5 py-3 rounded-lg border-2 text-xs font-bold tracking-wider transition-all cursor-pointer ${
-                  paymentMethod === m.label
+                  paymentMethodCode === m.code
                     ? "bg-white border-irms-green text-irms-green"
                     : "bg-irms-bg-secondary border-irms-border text-irms-text-muted hover:border-irms-green/40"
                 } ${!activeOrder ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                {m.icon}
-                {m.label}
+                {m.logo && m.logo.startsWith("<svg") ? (
+                  <div
+                    dangerouslySetInnerHTML={{ __html: m.logo }}
+                    className="w-5 h-5 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
+                  />
+                ) : m.logo ? (
+                  <img
+                    src={m.logo}
+                    alt={m.name}
+                    className="w-5 h-5 object-contain"
+                  />
+                ) : (
+                  <div className="w-5 h-5 bg-gray-200 rounded-full" />
+                )}
+                {m.name}
               </button>
             ))}
           </div>
 
           {/* CTA */}
           <button
-            onClick={handlePayment}
+            onClick={handleCompletePaymentClick}
             disabled={
               !activeOrder ||
               isProcessing ||
@@ -536,6 +542,37 @@ export default function PaymentPage({
           </button>
         </div>
       </div>
+
+      {/* Payment Popup */}
+      {showPopup && activeOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden relative border border-gray-100">
+            <button
+              onClick={handlePaymentCancel}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer p-1"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <PaymentPopupComponent
+              order={activeOrder}
+              onSuccess={handlePaymentSuccess}
+              onCancel={handlePaymentCancel}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

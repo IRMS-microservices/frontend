@@ -84,8 +84,8 @@ export interface UpdateOrderRequest {
   customerId?: string;
   customerName?: string;
   customerPhone?: string;
-  paymentStatus?: 'PENDING' | 'PAID' | 'CANCELLED';
-  serviceStatus?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  paymentStatus?: PaymentStatus;
+  serviceStatus?: ServiceStatus;
   note?: string;
 }
 

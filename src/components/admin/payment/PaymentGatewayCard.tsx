@@ -2,7 +2,10 @@
 
 import { Eye, Power } from "lucide-react";
 import Link from "next/link";
-import { PaymentCredentialsResponse, PaymentMethodResponse } from "@/types/payment.types";
+import {
+  PaymentCredentialsResponse,
+  PaymentMethodResponse,
+} from "@/types/payment.types";
 
 interface PaymentGatewayCardProps {
   method?: PaymentMethodResponse;
@@ -10,7 +13,11 @@ interface PaymentGatewayCardProps {
   href: string;
 }
 
-export function PaymentGatewayCard({ method, credentials, href }: PaymentGatewayCardProps) {
+export function PaymentGatewayCard({
+  method,
+  credentials,
+  href,
+}: PaymentGatewayCardProps) {
   const isActive = credentials.isActive;
   const statusLabel = isActive ? "ACTIVE" : "STANDBY";
   const statusTone = isActive
@@ -27,13 +34,21 @@ export function PaymentGatewayCard({ method, credentials, href }: PaymentGateway
             </span>
           </div>
           <div>
-            <h3 className="text-base font-bold text-irms-text-primary">{method?.name ?? "Payment Gateway"}</h3>
-            <p className="text-xs text-gray-500">{method?.code ?? credentials.paymentMethodId}</p>
+            <h3 className="text-base font-bold text-irms-text-primary">
+              {method?.name ?? "Payment Gateway"}
+            </h3>
+            <p className="text-xs text-gray-500">
+              {method?.code ?? credentials.paymentMethodId}
+            </p>
           </div>
         </div>
 
-        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] ring-1 ${statusTone}`}>
-          <span className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
+        <span
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] ring-1 ${statusTone}`}
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-400"}`}
+          />
           {statusLabel}
         </span>
       </div>
@@ -45,9 +60,16 @@ export function PaymentGatewayCard({ method, credentials, href }: PaymentGateway
         </div>
         <div className="max-h-24 space-y-1 overflow-hidden text-sm text-gray-600">
           {credentials.credentials.slice(0, 3).map((entry) => (
-            <div key={entry.key} className="flex items-center justify-between gap-3">
-              <span className="truncate font-medium text-gray-500">{entry.label}</span>
-              <span className="truncate font-mono text-gray-400">{String(entry.value)}</span>
+            <div
+              key={entry.key}
+              className="flex items-center justify-between gap-3"
+            >
+              <span className="truncate font-medium text-gray-500">
+                {entry.label}
+              </span>
+              <span className="truncate font-mono text-gray-400">
+                {String(entry.value)}
+              </span>
             </div>
           ))}
         </div>
@@ -68,7 +90,7 @@ export function PaymentGatewayCard({ method, credentials, href }: PaymentGateway
         )}
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-irms-green/30 to-transparent opacity-0 transition group-hover:opacity-100" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-linear-to-r from-transparent via-irms-green/30 to-transparent opacity-0 transition group-hover:opacity-100" />
     </div>
   );
 }

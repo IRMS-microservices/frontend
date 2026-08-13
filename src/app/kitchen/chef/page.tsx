@@ -3,7 +3,7 @@
 import { Topbar } from "@/components/shared/Topbar";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { KitchenService } from "@/services/kitchen.service";
-import { KitchenOrderResponse } from "@/types/kitchen.types";
+import { CookingStatus, KitchenOrderResponse } from "@/types/kitchen.types";
 import useElapsed from "@/hooks/useElapsed";
 
 // ---------------------------------------------------------------------------
@@ -289,12 +289,10 @@ export default function ChefViewPage() {
   const handleBump = useCallback(async (ticket: Ticket) => {
     setBumpingKeys((prev) => new Set(prev).add(ticket.key));
     try {
-      await Promise.all(
-        ticket.rows.map((row) =>
-          KitchenService.updateOrderItem(row.kitchenItemId, {
-            cookingStatus: "COMPLETED",
-          }),
-        ),
+      ticket.rows.forEach((row) =>
+        KitchenService.bumpItem(String(row.kitchenItemId), {
+          cookingStatus: CookingStatus.COMPLETED,
+        })
       );
       setTickets((prev) =>
         prev.map((t) => (t.key === ticket.key ? { ...t, bumped: true } : t)),
