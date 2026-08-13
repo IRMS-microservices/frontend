@@ -9,6 +9,7 @@ import {
   WorkspaceRegisterData,
 } from '../types/auth.types';
 import { RestaurantService } from './restaurant.service';
+import { UserResponse } from '@/types/user.types';
 
 export const AuthService = {
   /**
@@ -49,8 +50,8 @@ export const AuthService = {
    * POST /api/auth/register
    * Register a new staff user (ADMIN only).
    */
-  register: async (request: RegisterRequest): Promise<ApiResponse<AuthResponse>> => {
-    const response = await apiClient.post<ApiResponse<AuthResponse>>('/api/auth/register', request);
+  register: async (request: RegisterRequest): Promise<ApiResponse<UserResponse>> => {
+    const response = await apiClient.post<ApiResponse<UserResponse>>('/api/auth/register', request);
     return response.data;
   },
 
@@ -65,37 +66,4 @@ export const AuthService = {
     return response.data;
   },
 
-  /**
-   * Multi-step registration wizard:
-   * 1. POST /api/restaurants  — create workspace
-   * 2. POST /api/auth/register — create ADMIN user linked to that workspace
-   */
-  registerWorkspace: async (data: WorkspaceRegisterData): Promise<ApiResponse<AuthResponse>> => {
-    // Step 1: create the restaurant
-    const restaurantRes = await RestaurantService.createRestaurant({
-      name: data.restaurantName,
-    });
-
-    if (!restaurantRes.success || !restaurantRes.data?._id) {
-      return {
-        success: false,
-        message: restaurantRes.message ?? 'Failed to create restaurant workspace.',
-        data: null as unknown as AuthResponse,
-      };
-    }
-
-    const restaurantId = restaurantRes.data._id;
-
-    // Step 2: register the admin user for that restaurant
-    const registerRes = await AuthService.register({
-      username: data.username,
-      password: data.password,
-      fullName: data.fullName,
-      phoneNumber: data.phoneNumber,
-      role: 'ADMIN',
-      restaurantId,
-    });
-
-    return registerRes;
-  },
 };

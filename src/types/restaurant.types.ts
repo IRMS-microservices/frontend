@@ -18,6 +18,7 @@ export interface CreateRestaurantRequest {
   address?: string;
   phone?: string;
   pin?: string | number;
+  ownerId?: string;
 }
 
 export interface UpdateRestaurantRequest {

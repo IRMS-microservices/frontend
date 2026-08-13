@@ -9,14 +9,23 @@ import { WorkspaceRegisterData } from "@/types/auth.types";
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1);
-  const [registerData, setRegisterData] = useState<Partial<WorkspaceRegisterData>>({});
+  const [registerData, setRegisterData] = useState<
+    Partial<WorkspaceRegisterData>
+  >({});
 
-  const handleStep1Next = (step1Data: Pick<WorkspaceRegisterData, "fullName" | "username" | "phoneNumber" | "password">) => {
+  const handleStep1Next = (
+    step1Data: Pick<
+      WorkspaceRegisterData,
+      "fullName" | "username" | "phoneNumber" | "password"
+    >,
+  ) => {
     setRegisterData((prev) => ({ ...prev, ...step1Data }));
     setStep(2);
   };
 
-  const handleStep2Next = (step2Data: Pick<WorkspaceRegisterData, "restaurantName" | "businessType">) => {
+  const handleStep2Next = (
+    step2Data: Pick<WorkspaceRegisterData, "restaurantName">,
+  ) => {
     setRegisterData((prev) => ({ ...prev, ...step2Data }));
     setStep(3);
   };
@@ -34,7 +43,20 @@ export default function RegisterPage() {
             <IrmsLogo className="text-white" />
           ) : (
             <div className="flex items-center gap-3 font-bold text-2xl tracking-wide">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 4 13a7 7 0 0 1 14 0 7 7 0 0 1-7 7z"></path><path d="M11 11v9"></path><path d="M15 15l-4-4-4 4"></path></svg>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M11 20A7 7 0 0 1 4 13a7 7 0 0 1 14 0 7 7 0 0 1-7 7z"></path>
+                <path d="M11 11v9"></path>
+                <path d="M15 15l-4-4-4 4"></path>
+              </svg>
               The Culinary Curator
             </div>
           )}
@@ -43,25 +65,43 @@ export default function RegisterPage() {
         <div className="relative z-10 max-w-xl my-auto py-12">
           {step === 1 && (
             <>
-              <h1 className="text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight">Elevate<br />Every Course.</h1>
+              <h1 className="text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight">
+                Elevate
+                <br />
+                Every Course.
+              </h1>
               <p className="text-lg lg:text-xl text-[#A7C4B5] leading-relaxed max-w-md font-medium">
-                &quot;Precision in the kitchen translates to perfection on the plate. Our platform is the silent orchestrator of your culinary vision.&quot;
+                &quot;Precision in the kitchen translates to perfection on the
+                plate. Our platform is the silent orchestrator of your culinary
+                vision.&quot;
               </p>
             </>
           )}
 
           {step === 2 && (
             <div className="mt-40">
-              <h2 className="text-4xl font-bold mb-4 leading-tight">&quot;Excellence is not an act,<br />but a habit.&quot;</h2>
-              <p className="text-sm font-bold tracking-[0.2em] text-[#A7C4B5] uppercase">Curate Your Experience</p>
+              <h2 className="text-4xl font-bold mb-4 leading-tight">
+                &quot;Excellence is not an act,
+                <br />
+                but a habit.&quot;
+              </h2>
+              <p className="text-sm font-bold tracking-[0.2em] text-[#A7C4B5] uppercase">
+                Curate Your Experience
+              </p>
             </div>
           )}
 
           {step === 3 && (
             <div className="mt-20">
-              <h2 className="text-4xl font-bold mb-6 leading-tight">Service is ready to<br />commence.</h2>
+              <h2 className="text-4xl font-bold mb-6 leading-tight">
+                Service is ready to
+                <br />
+                commence.
+              </h2>
               <p className="text-lg text-[#A7C4B5] leading-relaxed max-w-md">
-                Your high-end restaurant management workspace has been meticulously prepared. Step into the digital Maître d&apos; experience.
+                Your high-end restaurant management workspace has been
+                meticulously prepared. Step into the digital Maître d&apos;
+                experience.
               </p>
             </div>
           )}
@@ -76,7 +116,20 @@ export default function RegisterPage() {
       {/* Right Panel - Form Area */}
       <div className="flex-1 flex flex-col justify-center items-center p-8 relative">
         <div className="absolute top-8 right-8 text-sm font-semibold text-gray-500 hover:text-gray-800 cursor-pointer flex items-center gap-2 transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
           Need Help?
         </div>
 
