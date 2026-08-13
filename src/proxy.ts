@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_ROUTES = ["/login"];
+const PUBLIC_ROUTES = ["/login", "/register"];
 const URL_MAP = new Map<string, string>([
     ["ADMIN", "/admin/dashboard"],
     ["SERVER", "/server/tables"],
