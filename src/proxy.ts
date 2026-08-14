@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/login", "/register"];
 const URL_MAP = new Map<string, string>([
-    ["ADMIN", "/admin/dashboard"],
+    ["ADMIN", "/admin/account"],
     ["SERVER", "/server/tables"],
     ["KITCHEN_STAFF", "/kitchen/chef"]
 ]);
@@ -17,7 +17,7 @@ export function proxy(request: NextRequest) {
         EXACT_PUBLIC_ROUTES.includes(pathname) ||
         PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
 
-    const token = request.cookies.get("token")?.value;
+    const token = request.cookies.get("accessToken")?.value;
     const role = request.cookies.get("role")?.value;
 
     if (!isPublicRoute && !token) {
@@ -30,7 +30,7 @@ export function proxy(request: NextRequest) {
         const homeUrl = URL_MAP.get(role ?? "");
         if (!homeUrl) {
             const response = NextResponse.redirect(new URL("/login", request.url));
-            response.cookies.delete("token");
+            response.cookies.delete("accessToken");
             response.cookies.delete("role");
             return response;
         }

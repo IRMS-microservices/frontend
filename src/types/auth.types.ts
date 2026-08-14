@@ -18,15 +18,6 @@ export interface RegisterRequest {
   restaurantName?: string;
 }
 
-/** Aggregated data collected across all steps of the registration wizard. */
-export interface WorkspaceRegisterData {
-  fullName: string;
-  username: string;
-  phoneNumber: string;
-  password: string;
-  restaurantName: string;
-}
-
 export interface VerifyRestaurantPinRequest {
   pin: string | number;
 }

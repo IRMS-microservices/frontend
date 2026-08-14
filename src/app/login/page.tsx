@@ -24,7 +24,7 @@ export default function LoginPage() {
       const response = await AuthService.login({ username, password });
       if (response.success) {
         if (response.data?.role === UserRole.ADMIN) {
-          router.push("/admin/dashboard");
+          router.push("/admin/account");
         } else if (response.data?.role === UserRole.KITCHEN) {
           router.push("/kitchen/expeditor");
         } else if (response.data?.role === UserRole.SERVER) {

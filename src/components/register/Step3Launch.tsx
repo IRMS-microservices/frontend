@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthService } from "@/services/auth.service";
-import { WorkspaceRegisterData } from "@/types/auth.types";
+import { RegisterRequest } from "@/types/auth.types";
+import { UserRole } from "@/types/user.types";
 
 interface Step3Props {
-  data: WorkspaceRegisterData;
+  data: RegisterRequest;
 }
 
 type Status = "loading" | "success" | "error";
@@ -17,13 +18,19 @@ export function Step3Launch({ data }: Step3Props) {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [countdown, setCountdown] = useState(4);
 
+  // 2. Add a ref flag to prevent double execution
+  const calledRegister = useRef(false);
+
   useEffect(() => {
-    let cancelled = false;
+    // 3. Prevent duplicate execution if already triggered
+    if (calledRegister.current) return;
+    calledRegister.current = true;
 
     const run = async () => {
-      const res = await AuthService.register(data);
-
-      if (cancelled) return;
+      const res = await AuthService.register({
+        ...data,
+        role: UserRole.ADMIN,
+      });
 
       if (!res.success) {
         setStatus("error");
@@ -35,13 +42,9 @@ export function Step3Launch({ data }: Step3Props) {
     };
 
     run();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [data]); // data as dependency
 
-  // Start countdown only after successful registration
+  // Countdown effect stays the same...
   useEffect(() => {
     if (status !== "success") return;
 

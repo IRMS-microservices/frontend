@@ -174,12 +174,12 @@ export default function AdminTablesPage() {
   const totalTables = tables.length;
 
   return (
-    <div className="min-h-screen flex bg-[#F4F7F6]">
+    <div className="h-screen flex overflow-hidden bg-[#F4F7F6]">
       <AdminSidebar />
 
-      <main className="ml-60 flex-1">
-        <div className="mx-auto max-w-400 px-8 py-8">
-          <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+      <main className="ml-60 flex-1 flex flex-col overflow-hidden min-w-0">
+        <div className="flex flex-col flex-1 min-h-0 px-8 py-8">
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-4 shrink-0">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-gray-500">
                 Configuration
@@ -203,14 +203,14 @@ export default function AdminTablesPage() {
           </div>
 
           {tableActionError && (
-            <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 shrink-0">
               {tableActionError}
             </div>
           )}
 
-          <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
-            <section className="rounded-4xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-              <div className="mb-5 flex items-center justify-between">
+          <div className="grid gap-6 xl:grid-cols-[340px_1fr] flex-1 min-h-0 overflow-hidden p-2">
+            <section className="rounded-4xl bg-white p-6 shadow-sm ring-1 ring-black/5 flex flex-col min-h-0">
+              <div className="mb-5 flex items-center justify-between shrink-0">
                 <h2 className="text-xl font-bold text-irms-text-primary">
                   Active Tables
                 </h2>
@@ -219,7 +219,7 @@ export default function AdminTablesPage() {
                 </span>
               </div>
 
-              <div className="mb-5 rounded-2xl bg-[#F4F7F6] px-4 py-3 ring-1 ring-black/5">
+              <div className="mb-5 rounded-2xl bg-[#F4F7F6] px-4 py-3 ring-1 ring-black/5 shrink-0">
                 <div className="flex items-center gap-3">
                   <Search className="h-4 w-4 text-gray-400" />
                   <input
@@ -249,7 +249,7 @@ export default function AdminTablesPage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-1">
                   {filteredTables.map((table) => {
                     const isSelected = selectedId === table._id;
                     const capacity = clampCapacity(table.capacity);
@@ -327,7 +327,7 @@ export default function AdminTablesPage() {
               )}
             </section>
 
-            <section className="rounded-4xl bg-white p-6 shadow-sm ring-1 ring-black/5">
+            <section className="rounded-4xl bg-white p-6 shadow-sm ring-1 ring-black/5 flex flex-col min-h-0 overflow-hidden">
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-irms-text-primary">
@@ -382,7 +382,7 @@ export default function AdminTablesPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex min-h-105 items-center justify-center rounded-4xl bg-[#F8FAFB] text-sm text-gray-500 ring-1 ring-black/5">
+                <div className="flex min-h-95 items-center justify-center rounded-4xl bg-[#F8FAFB] text-sm text-gray-500 ring-1 ring-black/5">
                   Select a table to preview its diagram.
                 </div>
               )}

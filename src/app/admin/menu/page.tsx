@@ -24,7 +24,7 @@ type IngredientRow = {
 };
 
 type MenuDraft = {
-  _id?: number;
+  _id?: string;
   name: string;
   category: DishCategory;
   basePrice: string;
@@ -115,7 +115,7 @@ export default function AdminMenuPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] =
     useState<(typeof CATEGORY_OPTIONS)[number]["value"]>("ALL");
-  const [selectedDishId, setSelectedDishId] = useState<number | null>(null);
+  const [selectedDishId, setSelectedDishId] = useState<string | null>(null);
   const [draft, setDraft] = useState<MenuDraft>(buildBlankDraft());
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -276,11 +276,11 @@ export default function AdminMenuPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#F4F7F6]">
+    <div className="h-screen flex overflow-hidden bg-[#F4F7F6]">
       <AdminSidebar />
 
-      <main className="ml-60 flex-1">
-        <div className="mx-auto max-w-400 px-8 py-8">
+      <main className="ml-60 flex-1 overflow-y-auto min-w-0">
+        <div className="px-8 py-8">
           <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.35em] text-gray-500">
@@ -294,22 +294,9 @@ export default function AdminMenuPage() {
                 specifications.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedDishId(null);
-                setDraft(buildBlankDraft());
-                setFeedback(null);
-              }}
-              className="inline-flex items-center gap-2 rounded-2xl bg-irms-green px-5 py-4 text-sm font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-irms-green/20 transition hover:bg-irms-green-light"
-            >
-              <Plus className="h-4 w-4" />
-              Add New Dish
-            </button>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+          <div className="grid gap-6 xl:grid-cols-[1fr_480px]">
             <section>
               <div className="mb-6 rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-black/5">
                 <div className="flex items-center gap-3">
@@ -460,7 +447,7 @@ export default function AdminMenuPage() {
               )}
             </section>
 
-            <aside className="sticky top-6 self-start">
+            <aside className="sticky top-0 self-start -translate-y-35">
               <div className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-4xl bg-white shadow-sm ring-1 ring-black/5">
                 <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-6 py-5">
                   <div>
@@ -470,10 +457,6 @@ export default function AdminMenuPage() {
                     <h2 className="mt-4 text-2xl font-bold text-irms-text-primary">
                       {draft.name || "New Dish"}
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-gray-500">
-                      Yield: {draft.yieldText} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Prep:{" "}
-                      {draft.prepTime} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Cook: {draft.cookTime}
-                    </p>
                   </div>
 
                   <button
@@ -548,7 +531,7 @@ export default function AdminMenuPage() {
                               basePrice: event.target.value,
                             }))
                           }
-                          className="rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-irms-green focus:ring-2 focus:ring-irms-green/15"
+                          className="rounded-2xl border max-w-52 border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-irms-green focus:ring-2 focus:ring-irms-green/15"
                           placeholder="28.00"
                         />
                       </label>
@@ -721,12 +704,7 @@ export default function AdminMenuPage() {
                 </div>
 
                 <div className="sticky bottom-0 border-t border-gray-100 bg-white px-6 py-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
-                      <ShieldCheck className="h-4 w-4 text-irms-green" />
-                      {feedback ?? "Changes are local until saved"}
-                    </div>
-
+                  <div className="flex items-center justify-end gap-3 ">
                     <div className="flex gap-3">
                       {draft._id && (
                         <button

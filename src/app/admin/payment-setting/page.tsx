@@ -53,8 +53,8 @@ export default function AdminPaymentSettingPage() {
 
       try {
         const [methodsRes, credentialsRes] = await Promise.all([
-          PaymentService.getPaymentMethods(),
-          PaymentService.getPaymentCredentials(),
+          PaymentService.getPaymentMethods().catch(() => ({ success: false as const, data: undefined })),
+          PaymentService.getPaymentCredentials().catch(() => ({ success: false as const, data: undefined })),
         ]);
 
         if (methodsRes.success && methodsRes.data) {
@@ -73,7 +73,7 @@ export default function AdminPaymentSettingPage() {
 
           const restaurantRes = await RestaurantService.getRestaurantById(
             derivedRestaurantId,
-          );
+          ).catch(() => ({ success: false as const, data: undefined }));
           if (restaurantRes.success && restaurantRes.data) {
             setRestaurant(restaurantRes.data);
           }
@@ -85,6 +85,10 @@ export default function AdminPaymentSettingPage() {
         } else {
           setRestaurantId(null);
           setPinConfigured(false);
+        }
+
+        if (!methodsRes.success && !credentialsRes.success) {
+          setLoadError("Unable to reach the payment service. Please check your connection or try again.");
         }
       } catch (error) {
         setLoadError(
@@ -230,10 +234,10 @@ export default function AdminPaymentSettingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F7F6] flex">
+    <div className="h-screen flex overflow-hidden bg-[#F4F7F6]">
       <AdminSidebar />
 
-      <main className="flex-1 ml-60">
+      <main className="ml-60 flex-1 overflow-y-auto min-w-0">
         <div className="mx-auto max-w-7xl px-8 py-8">
           <div className="mb-8 flex items-start justify-between gap-4">
             <div>

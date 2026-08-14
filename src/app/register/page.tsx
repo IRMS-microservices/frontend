@@ -5,17 +5,17 @@ import { Step1AdminIdentity } from "@/components/register/Step1AdminIdentity";
 import { Step2WorkspaceSetup } from "@/components/register/Step2WorkspaceSetup";
 import { Step3Launch } from "@/components/register/Step3Launch";
 import { IrmsLogo } from "@/components/shared/IrmsLogo";
-import { WorkspaceRegisterData } from "@/types/auth.types";
+import { RegisterRequest } from "@/types/auth.types";
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1);
-  const [registerData, setRegisterData] = useState<
-    Partial<WorkspaceRegisterData>
-  >({});
+  const [registerData, setRegisterData] = useState<Partial<RegisterRequest>>(
+    {},
+  );
 
   const handleStep1Next = (
     step1Data: Pick<
-      WorkspaceRegisterData,
+      RegisterRequest,
       "fullName" | "username" | "phoneNumber" | "password"
     >,
   ) => {
@@ -24,7 +24,7 @@ export default function RegisterPage() {
   };
 
   const handleStep2Next = (
-    step2Data: Pick<WorkspaceRegisterData, "restaurantName">,
+    step2Data: Pick<RegisterRequest, "restaurantName">,
   ) => {
     setRegisterData((prev) => ({ ...prev, ...step2Data }));
     setStep(3);
@@ -142,7 +142,7 @@ export default function RegisterPage() {
             />
           )}
           {step === 3 && registerData.fullName && (
-            <Step3Launch data={registerData as WorkspaceRegisterData} />
+            <Step3Launch data={registerData as RegisterRequest} />
           )}
         </div>
       </div>

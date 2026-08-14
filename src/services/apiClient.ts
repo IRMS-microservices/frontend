@@ -6,11 +6,13 @@ const ROLE_KEY = 'role';
 
 // Khởi tạo một Axios instance với cấu hình mặc định
 const apiClient = axios.create({
-  // Tạm thời dùng Next.js Route Handlers (Mock API) thay vì BE Java
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  // withCredentials ensures HttpOnly cookies (accessToken, refreshToken)
+  // set by the backend are automatically sent on every request.
+  withCredentials: true,
   // timeout: 10000, // 10 giây
 });
 
@@ -33,13 +35,11 @@ export const clearSession = () => {
 apiClient.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
-      // Try sessionStorage first, fall back to cookie
-      const token = sessionStorage.getItem('token')
-        ?? document.cookie
-          .split('; ')
-          .find(row => row.startsWith('token='))
-          ?.split('=')[1];
-
+      // The backend sets accessToken as an HttpOnly cookie, which is sent
+      // automatically by the browser (via withCredentials: true) and cannot
+      // be read by JS. We also attach any token stored in sessionStorage as
+      // a Bearer header for gateways that prefer the Authorization header.
+      const token = sessionStorage.getItem(TOKEN_KEY);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -49,14 +49,43 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+let isRefreshing = false;
+
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      console.warn("Forbidden: Token may be invalid or expired.");
-      clearSession()
-      window.location.href = '/login';
+    const originalRequest = error.config;
+
+    // Attempt a silent token refresh on the first 401, then retry.
+    // Skip if this IS the refresh request itself to avoid infinite loops.
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/api/auth/refresh-token')
+    ) {
+      if (isRefreshing) return Promise.reject(error);
+      isRefreshing = true;
+      originalRequest._retry = true;
+
+      try {
+        // The refresh token is in an HttpOnly cookie — no body payload needed.
+        await apiClient.post('/api/auth/refresh-token');
+        // The backend has rotated the accessToken cookie; also update
+        // sessionStorage with the new token if present in the response.
+        isRefreshing = false;
+        return apiClient(originalRequest);
+      } catch {
+        isRefreshing = false;
+        clearSession();
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
     }
+
+    if (error.response?.status === 403) {
+      console.warn('Forbidden: insufficient permissions.');
+    }
+
     return Promise.reject(error);
   }
 );
