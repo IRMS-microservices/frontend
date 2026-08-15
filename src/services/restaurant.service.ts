@@ -54,12 +54,12 @@ export const RestaurantService = {
   },
 
   setPin: async (pin: string): Promise<ApiResponse<void>> => {
-    const response = await apiClient.post(`/api/restaurants/pin`, { pin });
+    const response = await apiClient.post(`/api/restaurants/pin`, { pin: Number(pin) });
     return response.data;
   },
 
   verifyPin: async (pin: string): Promise<ApiResponse<void>> => {
-    const response = await apiClient.post(`/api/restaurants/pin/verify`, { pin });
+    const response = await apiClient.post(`/api/restaurants/pin/verify`, { pin: Number(pin) });
     return response.data;
   },
 };

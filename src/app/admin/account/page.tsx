@@ -225,13 +225,13 @@ export default function AdminAccountPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {isFetching ? (
-                  <tr>
+                  <tr key={"s"}>
                     <td colSpan={5} className="p-8 text-center text-gray-400">
                       Loading directory...
                     </td>
                   </tr>
                 ) : (
-                  users.data?.map((user: UserResponse) => {
+                  users.data?.map((user: UserResponse, idx) => {
                     const initials = user.fullName
                       ? user.fullName
                           .split(" ")
@@ -250,7 +250,7 @@ export default function AdminAccountPage() {
 
                     return (
                       <tr
-                        key={user.id}
+                        key={idx}
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4 flex items-center gap-4">
@@ -282,7 +282,7 @@ export default function AdminAccountPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {user.username.toLowerCase()}@culinarycurator.com
+                          {user.username.toLowerCase()}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
