@@ -194,7 +194,7 @@ export default function TableDetailPage({
           gender: g.gender,
           phone: g.phone,
         });
-        customerId = customerRes.data._id;
+        customerId = customerRes.data.id;
 
         // Save to localStorage immediately
         localStorage.setItem(

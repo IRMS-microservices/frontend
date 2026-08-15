@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 import { io, Socket } from 'socket.io-client';
-import { ApiResponse, Pagination } from '@/types/common.types';
+import { ApiResponse } from '@/types/common.types';
 import {
     KitchenOrderResponse,
     KitchenOrderItemResponse,
@@ -42,7 +42,7 @@ export const KitchenService = {
      */
     listOrders: async (
         query?: KitchenOrderQuery
-    ): Promise<ApiResponse<Pagination<KitchenOrderResponse[]>>> => {
+    ): Promise<ApiResponse<KitchenOrderResponse[]>> => {
         const response = await apiClient.get('/api/kitchen-orders', { params: query });
         return response.data;
     },

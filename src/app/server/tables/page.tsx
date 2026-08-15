@@ -54,14 +54,14 @@ export default function TablesPage() {
           CustomerService.getAllCustomers({ limit: 999_999_999 }),
         ]);
 
-        const backendTables = tableRes.data.data;
-        const orders = orderRes.data.data;
-        const customers = customerRes.data.data;
+        const backendTables = tableRes.data;
+        const orders = orderRes.data;
+        const customers = customerRes.data;
 
         const dynamicTables: TableData[] = backendTables.map((bt) => {
           const activeOrder = orders?.find(
             (o) =>
-              o.tableId === bt._id &&
+              o.tableId === bt.id &&
               (o.serviceStatus === "WAITING" || o.serviceStatus === "EATING"),
           );
 
@@ -81,7 +81,7 @@ export default function TablesPage() {
           }
 
           const customer = activeOrder
-            ? customers?.find((c) => c._id === activeOrder.customerId)
+            ? customers?.find((c) => c.id === activeOrder.customerId)
             : null;
 
           const customerDisplay =

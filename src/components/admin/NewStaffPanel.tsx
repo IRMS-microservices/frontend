@@ -9,7 +9,11 @@ interface NewStaffPanelProps {
   onSuccess: () => void;
 }
 
-export function NewStaffPanel({ isOpen, onClose, onSuccess }: NewStaffPanelProps) {
+export function NewStaffPanel({
+  isOpen,
+  onClose,
+  onSuccess,
+}: NewStaffPanelProps) {
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("SERVER");
   const [email, setEmail] = useState("");
@@ -31,11 +35,10 @@ export function NewStaffPanel({ isOpen, onClose, onSuccess }: NewStaffPanelProps
 
     setIsLoading(true);
     try {
-      const response = await AuthService.register({
+      const response = await AuthService.registerStaff({
         username,
         password,
         fullName,
-        phoneNumber: "N/A", // Not in UI, using dummy or add field if needed
         role: role.toUpperCase(),
       });
       if (response.success) {
@@ -70,8 +73,20 @@ export function NewStaffPanel({ isOpen, onClose, onSuccess }: NewStaffPanelProps
       <div className="fixed inset-y-0 right-0 w-100 bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 translate-x-0">
         <div className="flex items-center justify-between px-6 py-6 bg-irms-green text-white">
           <h2 className="text-xl font-bold tracking-wide">New Staff Account</h2>
-          <button onClick={onClose} className="hover:opacity-80 transition-opacity">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button
+            onClick={onClose}
+            className="hover:opacity-80 transition-opacity"
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
@@ -79,7 +94,11 @@ export function NewStaffPanel({ isOpen, onClose, onSuccess }: NewStaffPanelProps
         </div>
 
         <div className="flex-1 overflow-y-auto px-8 py-6">
-          <form id="new-staff-form" onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <form
+            id="new-staff-form"
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-5"
+          >
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 block">
                 Full Name
@@ -164,7 +183,9 @@ export function NewStaffPanel({ isOpen, onClose, onSuccess }: NewStaffPanelProps
               />
             </div>
 
-            {error && <div className="text-red-500 text-sm font-semibold">{error}</div>}
+            {error && (
+              <div className="text-red-500 text-sm font-semibold">{error}</div>
+            )}
           </form>
         </div>
 
@@ -173,8 +194,9 @@ export function NewStaffPanel({ isOpen, onClose, onSuccess }: NewStaffPanelProps
             form="new-staff-form"
             type="submit"
             disabled={isLoading}
-            className={`w-full bg-irms-green hover:bg-irms-green-light text-white rounded-lg py-3.5 text-sm font-bold shadow-md transition-colors ${isLoading ? "opacity-70 cursor-not-allowed" : ""
-              }`}
+            className={`w-full bg-irms-green hover:bg-irms-green-light text-white rounded-lg py-3.5 text-sm font-bold shadow-md transition-colors ${
+              isLoading ? "opacity-70 cursor-not-allowed" : ""
+            }`}
           >
             {isLoading ? "Registering..." : "Register"}
           </button>

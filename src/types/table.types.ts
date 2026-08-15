@@ -6,7 +6,7 @@ export enum TableStatus {
 }
 
 export interface TableResponse {
-  _id: string;
+  id: string;
   tableNumber: number;
   status: TableStatus;
   capacity: number;

@@ -1,5 +1,5 @@
 export interface CustomerResponse {
-  _id: string;
+  id: string;
   name: string;
   gender: string;
   phone: string;

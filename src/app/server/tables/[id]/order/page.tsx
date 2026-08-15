@@ -96,7 +96,7 @@ export default function OrderPage({
         const dishesResponse = await MenuService.getDishes({
           limit: 999_999_999,
         });
-        const dishes = dishesResponse.data.data;
+        const dishes = dishesResponse.data;
         const grouped: Record<Category, MenuItem[]> = {
           APPETIZERS: [],
           MAIN_COURSE: [],
@@ -106,7 +106,7 @@ export default function OrderPage({
 
         dishes.forEach((dish) => {
           grouped[dish.category as Category].push({
-            id: dish._id,
+            id: dish.id,
             name: dish.name,
             price: dish.basePrice,
             status: dish.available ? "IN STOCK" : "SOLD OUT",
@@ -170,7 +170,7 @@ export default function OrderPage({
         customerId: customerId || "0",
         note: orderNotes,
         items: cart.map((c) => ({
-          dishId: c.item.originalDish._id,
+          dishId: c.item.originalDish.id,
           quantity: c.quantity,
         })),
       });

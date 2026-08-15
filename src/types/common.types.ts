@@ -12,20 +12,20 @@ export interface ErrorDetails {
   stackTrace?: string;
 }
 
+export interface PaginationInfo {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface ApiResponse<T = any> {
   timestamp?: string;
   success: boolean;
   message: string;
   data: T;
+  pagination?: PaginationInfo;
   error?: ErrorDetails;
-}
-
-export interface Pagination<T = any> {
-  data: T;
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
 }
 
 export enum SocketEvent {

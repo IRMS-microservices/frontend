@@ -1,7 +1,7 @@
 export type EUnit = 'KG' | 'G' | 'L' | 'ML' | 'PCS';
 
 export interface InventoryResponse {
-    _id: string;
+    id: string;
     name: string;
     quantity: number;
     unit: EUnit;
@@ -45,7 +45,7 @@ export interface InventoryQuery {
 }
 
 export interface InventoryUpdatePayload {
-    _id: string;
+    id: string;
     name: string;
     quantity: number;
     unit: EUnit;

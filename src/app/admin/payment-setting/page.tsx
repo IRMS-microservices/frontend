@@ -26,7 +26,6 @@ const pinStorageKey = (restaurantId: string) =>
   `irms_payment_pin_configured_${restaurantId}`;
 
 export default function AdminPaymentSettingPage() {
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [restaurant, setRestaurant] = useState<RestaurantResponse | null>(null);
   const [methods, setMethods] = useState<PaymentMethodResponse[]>([]);
   const [credentials, setCredentials] = useState<PaymentCredentialsResponse[]>(
@@ -53,8 +52,14 @@ export default function AdminPaymentSettingPage() {
 
       try {
         const [methodsRes, credentialsRes] = await Promise.all([
-          PaymentService.getPaymentMethods().catch(() => ({ success: false as const, data: undefined })),
-          PaymentService.getPaymentCredentials().catch(() => ({ success: false as const, data: undefined })),
+          PaymentService.getPaymentMethods().catch(() => ({
+            success: false as const,
+            data: undefined,
+          })),
+          PaymentService.getPaymentCredentials().catch(() => ({
+            success: false as const,
+            data: undefined,
+          })),
         ]);
 
         if (methodsRes.success && methodsRes.data) {
@@ -66,11 +71,9 @@ export default function AdminPaymentSettingPage() {
         }
 
         const derivedRestaurantId = credentialsRes.success
-          ? credentialsRes.data?.[0]?.restaurantId ?? null
+          ? (credentialsRes.data?.[0]?.restaurantId ?? null)
           : null;
         if (derivedRestaurantId) {
-          setRestaurantId(derivedRestaurantId);
-
           const restaurantRes = await RestaurantService.getRestaurantById(
             derivedRestaurantId,
           ).catch(() => ({ success: false as const, data: undefined }));
@@ -83,12 +86,13 @@ export default function AdminPaymentSettingPage() {
               "true",
           );
         } else {
-          setRestaurantId(null);
           setPinConfigured(false);
         }
 
         if (!methodsRes.success && !credentialsRes.success) {
-          setLoadError("Unable to reach the payment service. Please check your connection or try again.");
+          setLoadError(
+            "Unable to reach the payment service. Please check your connection or try again.",
+          );
         }
       } catch (error) {
         setLoadError(
@@ -105,7 +109,7 @@ export default function AdminPaymentSettingPage() {
   }, []);
 
   const methodById = useMemo(() => {
-    return new Map(methods.map((method) => [method._id, method]));
+    return new Map(methods.map((method) => [method.id, method]));
   }, [methods]);
 
   const selectedGatewayMethod = useMemo(() => {
@@ -125,15 +129,11 @@ export default function AdminPaymentSettingPage() {
 
   useEffect(() => {
     if (!newGatewayMethodId && methods.length > 0) {
-      setNewGatewayMethodId(methods[0]._id);
+      setNewGatewayMethodId(methods[0].id);
     }
   }, [methods, newGatewayMethodId]);
 
   const handleSavePin = async () => {
-    if (!restaurantId) {
-      return;
-    }
-
     if (!/^\d{6}$/.test(pinValue)) {
       setPinError("Enter a valid 6-digit PIN.");
       return;
@@ -143,23 +143,11 @@ export default function AdminPaymentSettingPage() {
     setPinError(null);
 
     try {
-      const response = await RestaurantService.updateRestaurant(
-        restaurantId,
-        {
-          pin: pinValue,
-        },
-      );
+      const response = await RestaurantService.setPin(pinValue);
 
       if (!response.success) {
         throw new Error(response.message || "Failed to configure PIN");
       }
-
-      window.localStorage.setItem(
-        pinStorageKey(restaurantId),
-        "true",
-      );
-      setPinConfigured(true);
-      setPinValue("");
     } catch (error) {
       setPinError(
         error instanceof Error ? error.message : "Failed to configure PIN",
@@ -172,17 +160,13 @@ export default function AdminPaymentSettingPage() {
   const resetGatewayModal = () => {
     setGatewayError(null);
     setNewGatewayValues({});
-    if (methods[0]?._id) {
-      setNewGatewayMethodId(methods[0]._id);
+    if (methods[0]?.id) {
+      setNewGatewayMethodId(methods[0].id);
     }
   };
 
   const handleCreateGateway = async () => {
-    if (!restaurantId || !selectedGatewayMethod) {
-      return;
-    }
-
-    const requiredFields = selectedGatewayMethod.requiredFields ?? [];
+    const requiredFields = selectedGatewayMethod?.requiredFields ?? [];
     const missingField = requiredFields.find(
       (field) =>
         field.required !== false &&
@@ -207,7 +191,7 @@ export default function AdminPaymentSettingPage() {
 
     try {
       const response = await PaymentService.createPaymentCredentials({
-        paymentMethodId: selectedGatewayMethod._id,
+        paymentMethodId: selectedGatewayMethod!.id,
         isActive: true,
         credentials: credentialsPayload,
       });
@@ -216,8 +200,7 @@ export default function AdminPaymentSettingPage() {
         throw new Error(response.message || "Failed to create gateway");
       }
 
-      const refreshed = await PaymentService.getPaymentCredentials({
-      });
+      const refreshed = await PaymentService.getPaymentCredentials({});
       if (refreshed.success && refreshed.data) {
         setCredentials(refreshed.data);
       }
@@ -382,10 +365,10 @@ export default function AdminPaymentSettingPage() {
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {gatewayCards.map(({ credential, method }) => (
                   <PaymentGatewayCard
-                    key={credential._id}
+                    key={credential.id}
                     method={method}
                     credentials={credential}
-                    href={`/admin/payment-setting/${credential._id}`}
+                    href={`/admin/payment-setting/${credential.id}`}
                   />
                 ))}
               </div>
@@ -447,7 +430,7 @@ export default function AdminPaymentSettingPage() {
                       className="mt-3 w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 outline-none focus:border-irms-green focus:ring-2 focus:ring-irms-green/15"
                     >
                       {methods.map((method) => (
-                        <option key={method._id} value={method._id}>
+                        <option key={method.id} value={method.id}>
                           {method.name}
                         </option>
                       ))}

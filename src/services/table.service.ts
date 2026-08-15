@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import { ApiResponse, Pagination } from "@/types/common.types";
+import { ApiResponse } from "@/types/common.types";
 
 import {
   TableResponse,
@@ -14,8 +14,8 @@ export const TableService = {
    * Query floor table status (SERVER, ADMIN).
    * Supports: tableNumber, status, minCapacity, maxCapacity, page, limit
    */
-  getTables: async (query?: TableQuery): Promise<ApiResponse<Pagination<TableResponse[]>>> => {
-    const response = await apiClient.get<ApiResponse<Pagination<TableResponse[]>>>("/api/tables", {
+  getTables: async (query?: TableQuery): Promise<ApiResponse<TableResponse[]>> => {
+    const response = await apiClient.get<ApiResponse<TableResponse[]>>("/api/tables", {
       params: query,
     });
     return response.data;

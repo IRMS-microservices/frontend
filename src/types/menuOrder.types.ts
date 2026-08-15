@@ -22,13 +22,13 @@ export interface DishResponse {
   restaurantId: string;
   name: string;
   category: DishCategory;
-  basePrice: number;
+  price: number;
   available: boolean;
-  imageUrl: string;
+  image: string;
 }
 
 export interface OrderItemResponse {
-  _id: number;
+  id: number;
   dishId: string;
   dishName: string;
   quantity: number;
@@ -37,7 +37,7 @@ export interface OrderItemResponse {
 }
 
 export interface OrderResponse {
-  _id: number;
+  id: number;
   restaurantId: string;
   tableId: string;
   customerId: string;

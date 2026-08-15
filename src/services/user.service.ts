@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { ApiResponse, Pagination } from '../types/common.types';
+import { ApiResponse } from '../types/common.types';
 
 import { UserResponse, CreateUserRequest, UpdateUserRequest, UserListQuery } from '../types/user.types';
 
@@ -18,8 +18,8 @@ export const UserService = {
    * List staff users (ADMIN only).
    * Supports: role, search, page, limit
    */
-  listUsers: async (query?: UserListQuery): Promise<ApiResponse<Pagination<UserResponse[]>>> => {
-    const response = await apiClient.get<ApiResponse<Pagination<UserResponse[]>>>('/api/users/list', { params: query });
+  listUsers: async (query?: UserListQuery): Promise<ApiResponse<UserResponse[]>> => {
+    const response = await apiClient.get<ApiResponse<UserResponse[]>>('/api/users/list', { params: query });
     return response.data;
   },
 

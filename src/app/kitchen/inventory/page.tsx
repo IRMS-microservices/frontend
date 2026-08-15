@@ -5,22 +5,23 @@ import { Topbar } from "@/components/shared/Topbar";
 import { InventoryService } from "@/services/inventory.service";
 import { InventoryResponse } from "@/types/inventory.types";
 
-function getStatus(item: InventoryResponse): 'optimal' | 'low' | 'critical' {
-  if (item.quantity <= 0) return 'critical';
+function getStatus(item: InventoryResponse): "optimal" | "low" | "critical" {
+  if (item.quantity <= 0) return "critical";
   if (item.lastImportQuantity) {
-    const warningLimit = item.lastImportQuantity * ((item.warningThreshold ?? 20) / 100);
-    if (warningLimit > 0 && item.quantity <= warningLimit) return 'low';
+    const warningLimit =
+      item.lastImportQuantity * ((item.warningThreshold ?? 20) / 100);
+    if (warningLimit > 0 && item.quantity <= warningLimit) return "low";
   }
-  return 'optimal';
+  return "optimal";
 }
 
 function getUpdatedAgo(updatedAt?: string): string {
-  if (!updatedAt) return 'unknown';
+  if (!updatedAt) return "unknown";
   const diff = Math.floor((Date.now() - new Date(updatedAt).getTime()) / 1000);
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
-  return 'yesterday';
+  return "yesterday";
 }
 
 export default function KitchenInventoryPage() {
@@ -30,9 +31,11 @@ export default function KitchenInventoryPage() {
 
   const loadInventory = async () => {
     try {
-      const response = await InventoryService.listInventories({ limit: 999_999_999 });
-      if (response.data && response.data.data) {
-        setInventoryItems(response.data.data);
+      const response = await InventoryService.listInventories({
+        limit: 999_999_999,
+      });
+      if (response.data && response.data) {
+        setInventoryItems(response.data);
       }
     } catch (err) {
       console.error("Failed to load inventories", err);
@@ -47,7 +50,7 @@ export default function KitchenInventoryPage() {
     InventoryService.connect();
     const unsubscribe = InventoryService.onQuantityUpdated((payload) => {
       setInventoryItems((prevItems) => {
-        const idx = prevItems.findIndex((item) => item._id === payload._id);
+        const idx = prevItems.findIndex((item) => item.id === payload.id);
         const newItems = [...prevItems];
         if (idx > -1) {
           const updatedItem: InventoryResponse = {
@@ -66,7 +69,7 @@ export default function KitchenInventoryPage() {
         return newItems;
       });
 
-      setAnimatedItemId(payload._id);
+      setAnimatedItemId(payload.id);
       setTimeout(() => setAnimatedItemId(null), 1000);
     });
 
@@ -78,7 +81,7 @@ export default function KitchenInventoryPage() {
 
   const filtered = search.trim()
     ? inventoryItems.filter((item) =>
-        item.name.toLowerCase().includes(search.toLowerCase())
+        item.name.toLowerCase().includes(search.toLowerCase()),
       )
     : inventoryItems;
 
@@ -91,12 +94,26 @@ export default function KitchenInventoryPage() {
           {/* Header area */}
           <div className="flex justify-between items-start mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Live Inventory Status</h1>
-              <p className="text-sm text-gray-500">Real-time tracking for crucial high-value ingredients.</p>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                Live Inventory Status
+              </h1>
+              <p className="text-sm text-gray-500">
+                Real-time tracking for crucial high-value ingredients.
+              </p>
             </div>
 
             <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
@@ -114,13 +131,15 @@ export default function KitchenInventoryPage() {
           <div className="grid grid-cols-4 gap-6">
             {filtered.map((item, index) => {
               const status = getStatus(item);
-              const isAnimated = animatedItemId === item._id;
+              const isAnimated = animatedItemId === item.id;
 
               return (
                 <div
-                  key={item._id || index}
+                  key={item.id || index}
                   className={`bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between transition-all duration-500 ${
-                    isAnimated ? 'bg-green-50 scale-[1.02] shadow-md ring-2 ring-irms-green ring-opacity-50' : ''
+                    isAnimated
+                      ? "bg-green-50 scale-[1.02] shadow-md ring-2 ring-irms-green ring-opacity-50"
+                      : ""
                   }`}
                 >
                   <div className="flex justify-between items-center mb-6">
@@ -129,17 +148,19 @@ export default function KitchenInventoryPage() {
                     </span>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-gray-500 capitalize">{status}</span>
-                      {status === 'optimal' && (
+                      <span className="text-xs font-semibold text-gray-500 capitalize">
+                        {status}
+                      </span>
+                      {status === "optimal" && (
                         <div className="w-2.5 h-2.5 rounded-full bg-[#10B981]"></div>
                       )}
-                      {status === 'low' && (
+                      {status === "low" && (
                         <div className="w-2.5 h-2.5 rounded-full bg-[#64748B] flex items-center justify-center relative">
                           <div className="absolute inset-0 rounded-full bg-[#64748B] opacity-50 animate-ping"></div>
                           <div className="w-2.5 h-2.5 rounded-full bg-[#64748B] relative z-10"></div>
                         </div>
                       )}
-                      {status === 'critical' && (
+                      {status === "critical" && (
                         <div className="w-2.5 h-2.5 rounded-full bg-[#EF4444] flex items-center justify-center relative">
                           <div className="absolute inset-0 rounded-full bg-[#EF4444] opacity-50 animate-ping"></div>
                           <div className="w-2.5 h-2.5 rounded-full bg-[#EF4444] relative z-10"></div>
@@ -149,17 +170,35 @@ export default function KitchenInventoryPage() {
                   </div>
 
                   <div className="mb-8">
-                    <h3 className="font-bold text-gray-800 text-lg leading-tight mb-2 truncate" title={item.name}>{item.name}</h3>
+                    <h3
+                      className="font-bold text-gray-800 text-lg leading-tight mb-2 truncate"
+                      title={item.name}
+                    >
+                      {item.name}
+                    </h3>
                     <div className="flex items-baseline gap-1">
-                      <span className={`text-3xl font-bold ${status === 'critical' ? 'text-[#EF4444]' : 'text-gray-900'}`}>
+                      <span
+                        className={`text-3xl font-bold ${status === "critical" ? "text-[#EF4444]" : "text-gray-900"}`}
+                      >
                         {item.quantity}
                       </span>
-                      <span className="text-sm font-semibold text-gray-500">{item.unit}</span>
+                      <span className="text-sm font-semibold text-gray-500">
+                        {item.unit}
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 mt-auto">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <circle cx="12" cy="12" r="10"></circle>
                       <polyline points="12 6 12 12 16 14"></polyline>
                     </svg>
@@ -171,15 +210,26 @@ export default function KitchenInventoryPage() {
 
             {filtered.length === 0 && (
               <div className="col-span-4 text-center py-20 text-gray-400">
-                <svg className="mx-auto mb-4 opacity-30" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  className="mx-auto mb-4 opacity-30"
+                  width="48"
+                  height="48"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                   <circle cx="12" cy="10" r="3"></circle>
                 </svg>
-                <p className="text-sm font-semibold">No inventory items found.</p>
+                <p className="text-sm font-semibold">
+                  No inventory items found.
+                </p>
               </div>
             )}
           </div>
-
         </div>
       </main>
     </div>

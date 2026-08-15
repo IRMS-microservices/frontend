@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 import { io, Socket } from 'socket.io-client';
-import { ApiResponse, Pagination } from '@/types/common.types';
+import { ApiResponse } from '@/types/common.types';
 
 import {
     EUnit,
@@ -46,7 +46,7 @@ export const InventoryService = {
      */
     listInventories: async (
         query?: InventoryQuery
-    ): Promise<ApiResponse<Pagination<InventoryResponse[]>>> => {
+    ): Promise<ApiResponse<InventoryResponse[]>> => {
         const response = await apiClient.get('/api/inventories', { params: query });
         return response.data;
     },

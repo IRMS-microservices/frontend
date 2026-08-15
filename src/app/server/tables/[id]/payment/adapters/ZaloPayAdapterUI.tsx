@@ -3,7 +3,12 @@ import { PaymentAdapterProps } from "./PaymentAdapterRegistry";
 import { PaymentService } from "@/services/payment.service";
 import { QRCodeSVG } from "qrcode.react";
 
-export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({ order, paymentMethodId, onSuccess, onCancel }) => {
+export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({
+  order,
+  paymentMethodId,
+  onSuccess,
+  onCancel,
+}) => {
   const [isPolling, setIsPolling] = useState(true);
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
@@ -13,16 +18,19 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({ order, payment
   useEffect(() => {
     const createOrder = async () => {
       try {
-        const amount = order.items.reduce((sum, item) => sum + item.salePrice * item.quantity, 0);
+        const amount = order.items.reduce(
+          (sum, item) => sum + item.salePrice * item.quantity,
+          0,
+        );
         // Add service charge and tax
         const serviceCharge = amount * 0.18;
         const tax = amount * 0.08;
         const grandTotal = amount + serviceCharge + tax;
 
         const res = await PaymentService.createPaymentOrder({
-          orderId: order._id.toString(),
+          orderId: order.id.toString(),
           amount: grandTotal,
-          description: `Thanh toan don hang #${order._id}`,
+          description: `Thanh toan don hang #${order.id}`,
           paymentMethodId,
           restaurantId: order.restaurantId,
         });
@@ -33,7 +41,10 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({ order, payment
             setTransactionId(res.data.transactionId);
           }
         } else {
-          setError(res.data?.rawResponse?.toString() || "Failed to create ZaloPay order");
+          setError(
+            res.data?.rawResponse?.toString() ||
+              "Failed to create ZaloPay order",
+          );
         }
       } catch (err: any) {
         setError(err.message || "An error occurred");
@@ -41,7 +52,7 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({ order, payment
         setLoading(false);
       }
     };
-    
+
     createOrder();
   }, [order, paymentMethodId]);
 
@@ -91,7 +102,7 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({ order, payment
       <p className="text-irms-text-muted mb-6 text-center text-sm">
         Scan this QR code with your ZaloPay app to complete the payment.
       </p>
-      
+
       <div className="flex gap-4 w-full">
         <button
           onClick={onCancel}

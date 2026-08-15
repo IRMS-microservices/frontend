@@ -1,7 +1,7 @@
 import apiClient from './apiClient';
 import { io, Socket } from 'socket.io-client';
 import { CreateOrderRequest, OrderResponse, OrderQuery, UpdateOrderRequest } from '../types/menuOrder.types';
-import { ApiResponse, Pagination } from '@/types/common.types';
+import { ApiResponse } from '@/types/common.types';
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 let orderSocket: Socket | null = null;
@@ -35,7 +35,7 @@ export const OrderService = {
    * Supports: page, limit, tableId, customerId, customerName, customerPhone,
    *           paymentStatus, serviceStatus, createdBy, note, startDate, endDate
    */
-  getOrders: async (query?: OrderQuery): Promise<ApiResponse<Pagination<OrderResponse[]>>> => {
+  getOrders: async (query?: OrderQuery): Promise<ApiResponse<OrderResponse[]>> => {
     const response = await apiClient.get('/api/orders', { params: query });
     return response.data;
   },

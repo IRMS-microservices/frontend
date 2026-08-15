@@ -1,5 +1,5 @@
 export interface RestaurantResponse {
-  _id: string;
+  id: string;
   name: string;
   address?: string;
   phone?: string;

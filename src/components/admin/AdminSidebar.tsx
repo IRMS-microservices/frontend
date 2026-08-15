@@ -111,7 +111,7 @@ export function AdminSidebar() {
       </nav>
 
       <div className="px-4 pb-8 flex flex-col gap-2">
-        <button className="flex items-center gap-3 px-4 py-3 text-sm text-gray-500 hover:text-gray-800 font-semibold transition-colors w-full text-left">
+        <button className="flex cursor-pointer items-center gap-3 px-4 py-3 text-sm text-gray-500 hover:text-gray-800 font-semibold transition-colors w-full text-left">
           <svg
             width="18"
             height="18"
@@ -129,7 +129,7 @@ export function AdminSidebar() {
         </button>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 text-sm text-gray-500 hover:text-gray-800 font-semibold transition-colors w-full text-left"
+          className="flex cursor-pointer items-center gap-3 px-4 py-3 text-sm text-gray-500 hover:text-gray-800 font-semibold transition-colors w-full text-left"
         >
           <svg
             width="18"

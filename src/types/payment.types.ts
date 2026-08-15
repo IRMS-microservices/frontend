@@ -58,7 +58,7 @@ export interface CreatePaymentOrderRequest extends PaymentGatewayRequest {
 }
 
 export interface PaymentMethodResponse {
-  _id: string;
+  id: string;
   code: string;
   name: string;
   logo: string;
@@ -69,7 +69,7 @@ export interface PaymentMethodResponse {
 }
 
 export interface PaymentCredentialsResponse {
-  _id: string;
+  id: string;
   paymentMethodId: string;
   restaurantId: string;
   isActive: boolean;

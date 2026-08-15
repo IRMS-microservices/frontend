@@ -27,9 +27,8 @@ export function Step3Launch({ data }: Step3Props) {
     calledRegister.current = true;
 
     const run = async () => {
-      const res = await AuthService.register({
+      const res = await AuthService.registerAdmin({
         ...data,
-        role: UserRole.ADMIN,
       });
 
       if (!res.success) {

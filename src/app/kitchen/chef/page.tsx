@@ -61,13 +61,13 @@ function ordersToTickets(orders: KitchenOrderResponse[]): Ticket[] {
     const fireMs = parseFireTime(order.fireTime);
     for (const item of order.items) {
       tickets.push({
-        key: `${order._id}-${item._id}`,
+        key: `${order.id}-${item.id}`,
         dishName: item.dishName,
         groupFireTimeMs: fireMs,
         rows: [
           {
             tableId: order.orderId,
-            kitchenItemId: String(item._id),
+            kitchenItemId: String(item.id),
             quantity: item.quantity,
           },
         ],
@@ -236,7 +236,7 @@ export default function ChefViewPage() {
           limit: 999_999_999,
         });
         if (cancelled) return;
-        const sorted = (res.data.data ?? [])
+        const sorted = (res.data ?? [])
           .slice()
           .sort(
             (a, b) =>
@@ -292,7 +292,7 @@ export default function ChefViewPage() {
       ticket.rows.forEach((row) =>
         KitchenService.bumpItem(String(row.kitchenItemId), {
           cookingStatus: CookingStatus.COMPLETED,
-        })
+        }),
       );
       setTickets((prev) =>
         prev.map((t) => (t.key === ticket.key ? { ...t, bumped: true } : t)),

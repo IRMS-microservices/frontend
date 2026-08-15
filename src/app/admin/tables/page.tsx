@@ -50,7 +50,7 @@ export default function AdminTablesPage() {
     try {
       const tablesRes = await TableService.getTables({ limit: 999999 });
 
-      const source = tablesRes.success ? (tablesRes.data?.data ?? []) : [];
+      const source = tablesRes.success ? (tablesRes.data ?? []) : [];
       const initialTables = source.map(
         (table): TableResponse => ({
           ...table,
@@ -62,11 +62,11 @@ export default function AdminTablesPage() {
       setSelectedId((current) => {
         if (
           preferredSelectedId &&
-          initialTables.some((table) => table._id === preferredSelectedId)
+          initialTables.some((table) => table.id === preferredSelectedId)
         ) {
           return preferredSelectedId;
         }
-        return initialTables[0]?._id ?? current ?? null;
+        return initialTables[0]?.id ?? current ?? null;
       });
 
       return initialTables;
@@ -91,7 +91,7 @@ export default function AdminTablesPage() {
   }, [search, tables]);
 
   const selectedTable = useMemo(
-    () => tables.find((table) => table._id === selectedId) ?? null,
+    () => tables.find((table) => table.id === selectedId) ?? null,
     [selectedId, tables],
   );
 
@@ -100,7 +100,7 @@ export default function AdminTablesPage() {
   };
 
   const adjustCapacity = (tableId: string, direction: 1 | -1) => {
-    const currentTable = tables.find((table) => table._id === tableId);
+    const currentTable = tables.find((table) => table.id === tableId);
     if (!currentTable) return;
 
     const updatedCapacity = nextCapacity(currentTable.capacity, direction);
@@ -109,7 +109,7 @@ export default function AdminTablesPage() {
 
     setTables((current) =>
       current.map((table) =>
-        table._id === tableId
+        table.id === tableId
           ? {
               ...table,
               capacity: updatedCapacity,
@@ -161,7 +161,7 @@ export default function AdminTablesPage() {
       setCreateTableNumber(0);
       setCreateTableCapacity(4);
       setCreateTableStatus(TableStatus.AVAILABLE);
-      await loadTables(response.data._id);
+      await loadTables(response.data.id);
     } catch (error) {
       setTableActionError(
         error instanceof Error ? error.message : "Failed to create table.",
@@ -195,7 +195,7 @@ export default function AdminTablesPage() {
             <button
               type="button"
               onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-irms-green px-5 py-4 text-sm font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-irms-green/20 transition hover:bg-irms-green-light"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-irms-green px-5 py-4 text-sm font-bold uppercase tracking-[0.15em] text-white shadow-lg shadow-irms-green/20 transition hover:bg-irms-green-light"
             >
               <Plus className="h-4 w-4" />
               Add Table
@@ -250,15 +250,14 @@ export default function AdminTablesPage() {
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-1">
-                  {filteredTables.map((table) => {
-                    const isSelected = selectedId === table._id;
+                  {filteredTables.map((table, idx) => {
+                    const isSelected = selectedId === table.id;
                     const capacity = clampCapacity(table.capacity);
                     return (
-                      <button
-                        key={table._id}
-                        type="button"
-                        onClick={() => handleSelect(table._id)}
-                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                      <div
+                        key={`${table.id}-${idx}`}
+                        onClick={() => handleSelect(table.id)}
+                        className={`w-full rounded-2xl border px-4 py-4 text-left transition cursor-pointer ${
                           isSelected
                             ? "border-irms-green bg-[#F4FBF7] shadow-md"
                             : "border-gray-100 bg-[#FAFBFC] hover:border-gray-200 hover:bg-white"
@@ -272,10 +271,10 @@ export default function AdminTablesPage() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="mt-1 text-xs text-gray-500">
-                              ID: {table._id}
+                              ID: {table.id}
                             </div>
                           </div>
-                          <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 ring-1 ring-black/5">
+                          <span className="inline-flex -mt-2 mb-auto items-center rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 ring-1 ring-black/5">
                             {table.status}
                           </span>
                         </div>
@@ -292,7 +291,7 @@ export default function AdminTablesPage() {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                adjustCapacity(table._id, -1);
+                                adjustCapacity(table.id, -1);
                               }}
                               className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition hover:bg-gray-200"
                             >
@@ -305,7 +304,7 @@ export default function AdminTablesPage() {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                adjustCapacity(table._id, 1);
+                                adjustCapacity(table.id, 1);
                               }}
                               className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition hover:bg-gray-200"
                             >
@@ -320,7 +319,7 @@ export default function AdminTablesPage() {
                             Selected
                           </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -340,17 +339,26 @@ export default function AdminTablesPage() {
               </div>
 
               {selectedTable ? (
-                <div className="rounded-4xl bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_30%),linear-gradient(180deg,#fbfcfd,#f7f9fa)] p-6">
-                  <div className="rounded-4xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-                    <div className="mb-5 flex items-center justify-between gap-4">
+                <div className="rounded-4xl overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_30%),linear-gradient(180deg,#fbfcfd,#f7f9fa)] h-100 p-6">
+                  <div className="rounded-4xl max-h-80 px-6 py-4 shadow-sm ring-1 ring-black/5">
+                    <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-gray-400">
                           Selected Table
                         </div>
-                        <p className="mt-2 text-sm text-gray-600">
-                          ID: {selectedTable._id} · Status:{" "}
-                          {selectedTable.status} · Capacity:{" "}
-                          {clampCapacity(selectedTable.capacity)}
+                        <p className="mt-2 text-sm text-gray-600 flex gap-2">
+                          <span>
+                            <strong>ID: </strong> {selectedTable.id}
+                          </span>{" "}
+                          |
+                          <span>
+                            <strong> Status:</strong> {selectedTable.status}
+                          </span>{" "}
+                          |
+                          <span>
+                            <strong> Capacity:</strong>{" "}
+                            {clampCapacity(selectedTable.capacity)}
+                          </span>
                         </p>
                       </div>
 
@@ -367,17 +375,15 @@ export default function AdminTablesPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-center rounded-4xl bg-[#F8FAFB] px-4 py-10 ring-1 ring-black/5">
-                      <div className="w-full max-w-105">
-                        <TableDiagram
-                          capacity={clampCapacity(selectedTable.capacity)}
-                          guests={Math.min(
-                            selectedTable.currentGuestsNumber ?? 0,
-                            clampCapacity(selectedTable.capacity),
-                          )}
-                          className="mx-auto scale-[1.45] origin-center"
-                        />
-                      </div>
+                    <div className="w-full h-45 -mt-5 flex items-center">
+                      <TableDiagram
+                        capacity={clampCapacity(selectedTable.capacity)}
+                        guests={Math.min(
+                          selectedTable.currentGuestsNumber ?? 0,
+                          clampCapacity(selectedTable.capacity),
+                        )}
+                        className="mx-auto w-2 origin-center"
+                      />
                     </div>
                   </div>
                 </div>
@@ -390,7 +396,7 @@ export default function AdminTablesPage() {
               {selectedTable && (
                 <div className="mt-4 rounded-2xl bg-[#F8FAFB] px-4 py-3 text-sm text-gray-600 ring-1 ring-black/5">
                   <span className="font-bold text-irms-text-primary">
-                    {selectedTable.tableNumber}
+                    Table number {selectedTable.tableNumber}
                   </span>{" "}
                   is selected. Use the capacity controls to adjust the table
                   diagram.
@@ -517,7 +523,7 @@ export default function AdminTablesPage() {
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="rounded-2xl bg-gray-100 px-5 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-200"
+                className="rounded-2xl cursor-pointer bg-gray-100 px-5 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-200"
               >
                 Cancel
               </button>
@@ -525,7 +531,7 @@ export default function AdminTablesPage() {
                 type="button"
                 onClick={handleCreateTable}
                 disabled={isSubmittingCreate}
-                className="inline-flex items-center gap-2 rounded-2xl bg-irms-green px-5 py-3 text-sm font-bold text-white transition hover:bg-irms-green-light disabled:cursor-not-allowed disabled:opacity-50"
+                className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-irms-green px-5 py-3 text-sm font-bold text-white transition hover:bg-irms-green-light disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmittingCreate ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

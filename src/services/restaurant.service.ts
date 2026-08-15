@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { ApiResponse, Pagination } from '@/types/common.types';
+import { ApiResponse } from '@/types/common.types';
 import {
   RestaurantResponse,
   RestaurantQuery,
@@ -12,7 +12,7 @@ export const RestaurantService = {
    * GET /api/restaurants
    * Get all restaurants based on query
    */
-  getRestaurants: async (query?: RestaurantQuery): Promise<ApiResponse<Pagination<RestaurantResponse[]>>> => {
+  getRestaurants: async (query?: RestaurantQuery): Promise<ApiResponse<RestaurantResponse[]>> => {
     const response = await apiClient.get('/api/restaurants', { params: query });
     return response.data;
   },
@@ -50,6 +50,16 @@ export const RestaurantService = {
    */
   deleteRestaurant: async (id: string): Promise<ApiResponse<void>> => {
     const response = await apiClient.delete(`/api/restaurants/${id}`);
+    return response.data;
+  },
+
+  setPin: async (pin: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.post(`/api/restaurants/pin`, { pin });
+    return response.data;
+  },
+
+  verifyPin: async (pin: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.post(`/api/restaurants/pin/verify`, { pin });
     return response.data;
   },
 };

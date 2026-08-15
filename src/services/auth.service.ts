@@ -84,8 +84,17 @@ export const AuthService = {
    * POST /api/auth/register
    * Register a new staff user (ADMIN only).
    */
-  register: async (request: RegisterRequest): Promise<ApiResponse<UserResponse>> => {
-    const response = await apiClient.post<ApiResponse<UserResponse>>('/api/auth/register', request);
+  registerStaff: async (request: RegisterRequest): Promise<ApiResponse<UserResponse>> => {
+    const response = await apiClient.post<ApiResponse<UserResponse>>('/api/auth/register-staff', request);
+    return response.data;
+  },
+
+  /**
+   * POST /api/auth/register-admin
+   * Register a new admin user (ADMIN only).
+   */
+  registerAdmin: async (request: RegisterRequest): Promise<ApiResponse<UserResponse>> => {
+    const response = await apiClient.post<ApiResponse<UserResponse>>('/api/auth/register-admin', request);
     return response.data;
   },
 

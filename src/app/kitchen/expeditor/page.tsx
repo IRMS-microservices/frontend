@@ -30,7 +30,7 @@ export default function ExpeditorViewPage() {
 
   const buildTicket = useCallback(
     (ko: KitchenOrderResponse, tableId: string): Ticket => ({
-      kitchenOrderId: ko._id,
+      kitchenOrderId: ko.id,
       orderId: ko.orderId,
       tableId,
       fireTime: ko.fireTime,
@@ -54,11 +54,13 @@ export default function ExpeditorViewPage() {
         }),
       ]);
 
-      const kitchenOrders: KitchenOrderResponse[] = kitchenRes.data.data ?? [];
-      const waitingOrders = ordersRes.data.data ?? [];
+      const kitchenOrders: KitchenOrderResponse[] = kitchenRes.data ?? [];
+      const waitingOrders = ordersRes.data ?? [];
 
       const tableMap = new Map<string, string>(
-        waitingOrders.map((o: any) => [o.orderId, o.tableId] as [string, string]),
+        waitingOrders.map(
+          (o: any) => [o.orderId, o.tableId] as [string, string],
+        ),
       );
       orderIdToTableIdRef.current = tableMap;
 
@@ -129,8 +131,7 @@ export default function ExpeditorViewPage() {
             return {
               ...ticket,
               items: ticket.items.map((item) =>
-                String(item._id) ===
-                String(completedItem._id || completedItem.id)
+                String(item.id) === String(completedItem.id || completedItem.id)
                   ? { ...item, cookingStatus: CookingStatus.COMPLETED }
                   : item,
               ),
@@ -285,7 +286,7 @@ export default function ExpeditorViewPage() {
                         item.cookingStatus === CookingStatus.COMPLETED;
                       return (
                         <div
-                          key={item._id}
+                          key={item.id}
                           className="flex items-center justify-between gap-2"
                         >
                           <span className="text-sm font-semibold text-irms-text-primary truncate">

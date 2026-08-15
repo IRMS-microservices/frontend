@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { MenuService } from "@/services/menu.service";
@@ -24,7 +25,7 @@ type IngredientRow = {
 };
 
 type MenuDraft = {
-  _id?: string;
+  id?: string;
   name: string;
   category: DishCategory;
   basePrice: string;
@@ -70,11 +71,11 @@ const defaultIngredients = (category: DishCategory): IngredientRow[] => {
 };
 
 const buildDraftFromDish = (dish: DishResponse): MenuDraft => ({
-  _id: dish._id,
+  id: dish._id,
   name: dish.name,
   category: dish.category,
-  basePrice: String(dish.basePrice),
-  imageUrl: dish.imageUrl,
+  basePrice: String(dish.price),
+  imageUrl: dish.image,
   available: dish.available,
   yieldText: "1 Portion",
   prepTime: "15m",
@@ -125,8 +126,8 @@ export default function AdminMenuPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const dishRes = await MenuService.getDishes({ limit: 100 });
-        const list = dishRes.success ? (dishRes.data?.data ?? []) : [];
+        const dishRes = await MenuService.getDishes({ limit: 999_999_999 });
+        const list = dishRes.success ? (dishRes.data ?? []) : [];
         setDishes(list);
 
         if (list[0]) {
@@ -157,7 +158,7 @@ export default function AdminMenuPage() {
     return dishes.filter((dish) => {
       const matchesSearch =
         !term ||
-        [dish.name, titleCase(dish.category), String(dish.basePrice)]
+        [dish.name, titleCase(dish.category), String(dish.price)]
           .join(" ")
           .toLowerCase()
           .includes(term);
@@ -188,9 +189,9 @@ export default function AdminMenuPage() {
       };
 
       let saved: DishResponse | null = null;
-      if (draft._id) {
+      if (draft.id) {
         const response = await MenuService.updateDish(
-          String(draft._id),
+          String(draft.id),
           payload,
         );
         saved = response.success ? (response.data ?? null) : null;
@@ -205,7 +206,7 @@ export default function AdminMenuPage() {
 
       const refreshed = await MenuService.getDishes({ limit: 100 });
       if (refreshed.success && refreshed.data) {
-        const next = refreshed.data.data ?? [];
+        const next = refreshed.data ?? [];
         setDishes(next);
         const matched = next.find((dish) => dish._id === saved?._id);
         if (matched) {
@@ -232,21 +233,21 @@ export default function AdminMenuPage() {
   };
 
   const deleteDish = async () => {
-    if (!draft._id) {
+    if (!draft.id) {
       return;
     }
 
     setIsDeleting(true);
     setFeedback(null);
     try {
-      const response = await MenuService.deleteDish(String(draft._id));
+      const response = await MenuService.deleteDish(String(draft.id));
       if (!response.success) {
         throw new Error(response.message || "Failed to delete dish.");
       }
 
       const refreshed = await MenuService.getDishes({ limit: 100 });
       if (refreshed.success && refreshed.data) {
-        const next = refreshed.data.data ?? [];
+        const next = refreshed.data ?? [];
         setDishes(next);
         setSelectedDishId(next[0]?._id ?? null);
         setDraft(next[0] ? buildDraftFromDish(next[0]) : buildBlankDraft());
@@ -318,7 +319,7 @@ export default function AdminMenuPage() {
                       key={item.value}
                       type="button"
                       onClick={() => setCategory(item.value)}
-                      className={`rounded-full px-5 py-3 text-sm font-medium transition ${
+                      className={`rounded-full px-5 py-3 text-sm font-medium transition cursor-pointer ${
                         active
                           ? "bg-white text-irms-text-primary shadow-sm ring-1 ring-black/5"
                           : "bg-[#ECEFF1] text-gray-500 hover:bg-gray-200"
@@ -352,11 +353,10 @@ export default function AdminMenuPage() {
                   {filteredDishes.map((dish) => {
                     const selected = selectedDishId === dish._id;
                     return (
-                      <button
+                      <div
                         key={dish._id}
-                        type="button"
                         onClick={() => setSelectedDishId(dish._id)}
-                        className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
+                        className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm cursor-pointer hover:scale-105 transition-all duration-150 ${
                           selected
                             ? "border-irms-green shadow-lg ring-4 ring-emerald-100"
                             : "border-gray-100 hover:border-gray-200 hover:shadow-md"
@@ -365,10 +365,11 @@ export default function AdminMenuPage() {
                         <div className="flex gap-4 p-4">
                           <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-[#F4F7F6]">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={dish.imageUrl}
+                            <Image
+                              src={dish.image || "/images/dish-placeholder.png"}
                               alt={dish.name}
-                              className="h-full w-full object-cover"
+                              fill
+                              className="object-cover"
                             />
                           </div>
 
@@ -429,7 +430,10 @@ export default function AdminMenuPage() {
                               {dish.name}
                             </h3>
                             <div className="mt-3 text-lg font-bold text-irms-green">
-                              ${dish.basePrice.toFixed(2)}
+                              {dish.price.toLocaleString("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
+                              })}
                             </div>
                           </div>
                         </div>
@@ -440,15 +444,15 @@ export default function AdminMenuPage() {
                             View recipe
                           </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
               )}
             </section>
 
-            <aside className="sticky top-0 self-start -translate-y-35">
-              <div className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-4xl bg-white shadow-sm ring-1 ring-black/5">
+            <aside className="absolute top-5 bottom-10 right-4 left-auto max-w-120">
+              <div className="flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-4xl bg-white shadow-2xl ring-1 ring-black/5">
                 <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-6 py-5">
                   <div>
                     <div className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-gray-500">
@@ -706,7 +710,7 @@ export default function AdminMenuPage() {
                 <div className="sticky bottom-0 border-t border-gray-100 bg-white px-6 py-5">
                   <div className="flex items-center justify-end gap-3 ">
                     <div className="flex gap-3">
-                      {draft._id && (
+                      {draft.id && (
                         <button
                           type="button"
                           onClick={deleteDish}

@@ -16,6 +16,7 @@ export interface RegisterRequest {
   phoneNumber?: string;
   role?: string;
   restaurantName?: string;
+  restaurantId?: string;
 }
 
 export interface VerifyRestaurantPinRequest {

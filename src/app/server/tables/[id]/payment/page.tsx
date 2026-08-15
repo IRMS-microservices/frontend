@@ -161,12 +161,10 @@ export default function PaymentPage({
 
           const supported = creds
             .map((cred) => {
-              const method = methods.find(
-                (m) => m._id === cred.paymentMethodId,
-              );
+              const method = methods.find((m) => m.id === cred.paymentMethodId);
               if (method && method.isActive) {
                 return {
-                  id: method._id,
+                  id: method.id,
                   code: method.code,
                   name: method.name,
                   logo: method.logo,
@@ -207,7 +205,7 @@ export default function PaymentPage({
         if (updatedOrder.tableId !== tableId) return;
 
         setActiveOrder((prev) => {
-          if (prev && prev._id === updatedOrder._id) {
+          if (prev && prev.id === updatedOrder.id) {
             return { ...prev, ...updatedOrder };
           }
           // If no active order yet, pick up this one if it's in a relevant status
@@ -250,7 +248,7 @@ export default function PaymentPage({
     setIsProcessing(true);
     setShowPopup(false);
     try {
-      await OrderService.updateOrder(activeOrder._id.toString(), {
+      await OrderService.updateOrder(activeOrder.id.toString(), {
         serviceStatus: ServiceStatus.FINISHED,
         paymentStatus: PaymentStatus.PAID,
       });
@@ -325,7 +323,7 @@ export default function PaymentPage({
             <div className="bg-white rounded-2xl border border-irms-border p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-bold text-irms-text-primary">
-                  Order Details (ID: #{activeOrder._id})
+                  Order Details (ID: #{activeOrder.id})
                 </h3>
                 <span className="text-xs font-bold text-irms-text-muted tracking-widest">
                   {activeOrder.items.reduce((s, i) => s + i.quantity, 0)} ITEMS
@@ -341,7 +339,7 @@ export default function PaymentPage({
                       : ServiceStatus.FINISHED;
                   return (
                     <div
-                      key={item._id}
+                      key={item.id}
                       className="flex items-center gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0"
                     >
                       <div className="w-8 h-8 rounded-lg bg-irms-bg-secondary flex items-center justify-center text-sm font-bold text-irms-text-primary shrink-0">

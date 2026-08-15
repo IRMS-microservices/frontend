@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 import { DishResponse, DishQuery } from '../types/menuOrder.types';
-import { ApiResponse, Pagination } from '@/types/common.types';
+import { ApiResponse } from '@/types/common.types';
 
 export const MenuService = {
   /**
@@ -8,7 +8,7 @@ export const MenuService = {
    * Public menu catalog. Supports: page, limit, sortBy, sortOrder, name,
    * category, isAvailable, minPrice, maxPrice
    */
-  getDishes: async (query?: DishQuery): Promise<ApiResponse<Pagination<DishResponse[]>>> => {
+  getDishes: async (query?: DishQuery): Promise<ApiResponse<DishResponse[]>> => {
     const response = await apiClient.get('/api/dishes', { params: query });
     return response.data;
   },

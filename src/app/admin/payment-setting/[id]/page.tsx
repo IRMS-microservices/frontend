@@ -107,7 +107,7 @@ export default function PaymentGatewayDetailPage() {
 
         const method = methodRes.success
           ? (methodRes.data?.find(
-              (item) => item._id === credentialRes.data.paymentMethodId,
+              (item) => item.id === credentialRes.data.paymentMethodId,
             ) ?? null)
           : null;
         setPaymentMethod(method);

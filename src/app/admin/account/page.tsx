@@ -4,16 +4,20 @@ import { useState, useEffect } from "react";
 import { UserService } from "@/services/user.service";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { NewStaffPanel } from "@/components/admin/NewStaffPanel";
-import { Pagination } from "@/types/common.types";
+import { ApiResponse } from "@/types/common.types";
 import { UserResponse } from "@/types/user.types";
 
 export default function AdminAccountPage() {
-  const [users, setUsers] = useState<Pagination<UserResponse[]>>({
+  const [users, setUsers] = useState<ApiResponse<UserResponse[]>>({
     data: [],
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 1,
+    pagination: {
+      total: 0,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+    },
+    message: "",
+    success: false,
   });
   const [isFetching, setIsFetching] = useState(true);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -27,7 +31,7 @@ export default function AdminAccountPage() {
     try {
       const response = await UserService.listUsers();
       if (response.success && response.data) {
-        setUsers(response.data);
+        setUsers(response);
       }
     } catch (err: any) {
       console.error("Failed to fetch users:", err);
@@ -40,7 +44,7 @@ export default function AdminAccountPage() {
     try {
       const response = await UserService.listUsers({ page });
       if (response.success && response.data) {
-        setUsers(response.data);
+        setUsers(response);
       }
     } catch (err: any) {
       console.error("Failed to fetch users:", err);
@@ -89,7 +93,7 @@ export default function AdminAccountPage() {
                   Total Staff
                 </p>
                 <h3 className="text-4xl font-bold text-irms-text-primary">
-                  {users.total}
+                  {users.pagination?.total || 0}
                 </h3>
               </div>
               <p className="text-xs text-irms-green font-semibold mt-4 flex items-center gap-1">
@@ -116,7 +120,7 @@ export default function AdminAccountPage() {
                   Active Shifts
                 </p>
                 <h3 className="text-4xl font-bold text-irms-text-primary">
-                  {users.total}
+                  {users.pagination?.total || 0}
                 </h3>
               </div>
               <p className="text-xs text-gray-500 font-semibold mt-4 flex items-center gap-2">
@@ -131,7 +135,7 @@ export default function AdminAccountPage() {
                   Pending Requests
                 </p>
                 <h3 className="text-4xl font-bold text-irms-text-primary">
-                  {users.total}
+                  {users.pagination?.total || 0}
                 </h3>
               </div>
               <p className="text-xs text-gray-500 font-semibold mt-4">
@@ -246,7 +250,7 @@ export default function AdminAccountPage() {
 
                     return (
                       <tr
-                        key={user._id}
+                        key={user.id}
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4 flex items-center gap-4">
@@ -326,19 +330,23 @@ export default function AdminAccountPage() {
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-between items-center text-sm text-gray-500">
               <span>
-                Showing {users.limit * (users.page - 1) + 1} -{" "}
-                {Math.min(users.limit * users.page, users.total)} of{" "}
-                {users.total} members
+                Showing{" "}
+                {users.pagination?.limit! * (users.pagination?.page! - 1) + 1} -{" "}
+                {Math.min(
+                  users.pagination?.limit! * users.pagination?.page!,
+                  users.pagination?.total || 0,
+                )}{" "}
+                of {users.pagination?.total || 0} members
               </span>
               <div className="flex gap-1">
                 <button
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => {
                     const currentGroupStart =
-                      Math.floor((users.page - 1) / 5) * 5 + 1;
+                      Math.floor((users.pagination?.page! - 1) / 5) * 5 + 1;
                     onPageSwitch(Math.max(1, currentGroupStart - 1));
                   }}
-                  disabled={users.page <= 5}
+                  disabled={users.pagination?.page! <= 5}
                 >
                   &lt;
                 </button>
@@ -346,16 +354,17 @@ export default function AdminAccountPage() {
                   {
                     length: Math.min(
                       5,
-                      users.totalPages - Math.floor((users.page - 1) / 5) * 5,
+                      users.pagination?.totalPages! -
+                        Math.floor((users.pagination?.page! - 1) / 5) * 5,
                     ),
                   },
                   (_, i) => {
                     const pageNum =
-                      Math.floor((users.page - 1) / 5) * 5 + i + 1;
+                      Math.floor((users.pagination?.page! - 1) / 5) * 5 + i + 1;
                     return (
                       <button
                         key={pageNum}
-                        className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold ${users.page === pageNum ? "bg-irms-green text-white" : "bg-gray-50 hover:bg-gray-100"}`}
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold ${users.pagination?.page === pageNum ? "bg-irms-green text-white" : "bg-gray-50 hover:bg-gray-100"}`}
                         onClick={() => onPageSwitch(pageNum)}
                       >
                         {pageNum}
@@ -367,13 +376,17 @@ export default function AdminAccountPage() {
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => {
                     const currentGroupStart =
-                      Math.floor((users.page - 1) / 5) * 5 + 1;
+                      Math.floor((users.pagination?.page! - 1) / 5) * 5 + 1;
                     onPageSwitch(
-                      Math.min(users.totalPages, currentGroupStart + 5),
+                      Math.min(
+                        users.pagination?.totalPages!,
+                        currentGroupStart + 5,
+                      ),
                     );
                   }}
                   disabled={
-                    Math.floor((users.page - 1) / 5) * 5 + 5 >= users.totalPages
+                    Math.floor((users.pagination?.page! - 1) / 5) * 5 + 5 >=
+                    users.pagination?.totalPages!
                   }
                 >
                   &gt;
