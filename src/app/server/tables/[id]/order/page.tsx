@@ -106,11 +106,11 @@ export default function OrderPage({
 
         dishes.forEach((dish) => {
           grouped[dish.category as Category].push({
-            id: dish.id,
+            id: dish._id,
             name: dish.name,
-            price: dish.basePrice,
+            price: dish.price,
             status: dish.available ? "IN STOCK" : "SOLD OUT",
-            image: dish.imageUrl,
+            image: dish.image,
             originalDish: dish,
           });
         });
@@ -170,7 +170,7 @@ export default function OrderPage({
         customerId: customerId || "0",
         note: orderNotes,
         items: cart.map((c) => ({
-          dishId: c.item.originalDish.id,
+          dishId: c.item.originalDish._id,
           quantity: c.quantity,
         })),
       });

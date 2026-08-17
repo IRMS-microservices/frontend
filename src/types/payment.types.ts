@@ -69,7 +69,7 @@ export interface PaymentMethodResponse {
 }
 
 export interface PaymentCredentialsResponse {
-  id: string;
+  _id: string;
   paymentMethodId: string;
   restaurantId: string;
   isActive: boolean;

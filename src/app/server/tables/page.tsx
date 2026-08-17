@@ -11,7 +11,8 @@ import { CustomerService } from "@/services/customer.service";
 import { TableStatus } from "@/types/table.types";
 
 interface TableData {
-  id: number;
+  id: string;
+  tableNumber: number;
   seats: number;
   seatedGuests?: number;
   status: TableStatus;
@@ -118,7 +119,8 @@ export default function TablesPage() {
           }
 
           return {
-            id: bt.tableNumber,
+            id: bt.id,
+            tableNumber: bt.tableNumber,
             seats: bt.capacity,
             seatedGuests: bt.currentGuestsNumber,
             status: status,
@@ -165,7 +167,7 @@ export default function TablesPage() {
           ) : (
             <div className="grid grid-cols-3 gap-4">
               {tables
-                .sort((a, b) => a.id - b.id)
+                .sort((a, b) => a.tableNumber - b.tableNumber)
                 .map((table) => {
                   const s = STATUS_STYLES[table.status];
                   return (

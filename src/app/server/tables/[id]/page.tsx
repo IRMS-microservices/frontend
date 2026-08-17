@@ -119,7 +119,7 @@ export default function TableDetailPage({
         setTableInfo(tableData);
 
         const orders = ordersRes.data;
-        const currentActiveOrder = orders?.data.find(
+        const currentActiveOrder = orders?.find(
           (o) =>
             o.serviceStatus === ServiceStatus.WAITING ||
             o.serviceStatus === ServiceStatus.EATING,
@@ -267,13 +267,13 @@ export default function TableDetailPage({
             </Link>
             <span>›</span>
             <span className="text-irms-text-primary">
-              Table {tableId} Detail
+              Table {tableInfo?.tableNumber} Detail
             </span>
           </nav>
 
           {/* Title */}
           <h2 className="text-4xl font-bold text-irms-text-primary mb-2">
-            Table {tableId}
+            Table {tableInfo?.tableNumber}
           </h2>
           <p className="text-sm text-irms-text-muted flex items-center gap-2 mb-8">
             <span

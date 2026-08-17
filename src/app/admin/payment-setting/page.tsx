@@ -325,12 +325,12 @@ export default function AdminPaymentSettingPage() {
               </div>
             ) : (
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {gatewayCards.map(({ credential, method }) => (
+                {gatewayCards.map(({ credential, method }, idx) => (
                   <PaymentGatewayCard
-                    key={credential.id}
+                    key={idx}
                     method={method}
                     credentials={credential}
-                    href={`/admin/payment-setting/${credential.id}`}
+                    href={`/admin/payment-setting/${credential._id}`}
                   />
                 ))}
               </div>
