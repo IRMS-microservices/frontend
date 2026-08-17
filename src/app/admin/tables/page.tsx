@@ -271,7 +271,8 @@ export default function AdminTablesPage() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="mt-1 text-xs text-gray-500">
-                              ID: {table.id}
+                              <strong>ID: </strong>
+                              {table.id}
                             </div>
                           </div>
                           <span className="inline-flex -mt-2 mb-auto items-center rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 ring-1 ring-black/5">

@@ -6,12 +6,12 @@ import { PinCodeInput } from "@/components/admin/payment/PinCodeInput";
 import { PaymentGatewayCard } from "@/components/admin/payment/PaymentGatewayCard";
 import { PaymentService } from "@/services/payment.service";
 import { RestaurantService } from "@/services/restaurant.service";
+import Image from "next/image";
 import {
   PaymentCredentialEntryInput,
   PaymentCredentialsResponse,
   PaymentMethodResponse,
 } from "@/types/payment.types";
-import { RestaurantResponse } from "@/types/restaurant.types";
 import {
   AlertCircle,
   ChevronRight,
@@ -19,14 +19,9 @@ import {
   Loader2,
   LockKeyhole,
   Save,
-  Settings2,
 } from "lucide-react";
 
-const pinStorageKey = (restaurantId: string) =>
-  `irms_payment_pin_configured_${restaurantId}`;
-
 export default function AdminPaymentSettingPage() {
-  const [restaurant, setRestaurant] = useState<RestaurantResponse | null>(null);
   const [methods, setMethods] = useState<PaymentMethodResponse[]>([]);
   const [credentials, setCredentials] = useState<PaymentCredentialsResponse[]>(
     [],
@@ -70,24 +65,8 @@ export default function AdminPaymentSettingPage() {
           setCredentials(credentialsRes.data);
         }
 
-        const derivedRestaurantId = credentialsRes.success
-          ? (credentialsRes.data?.[0]?.restaurantId ?? null)
-          : null;
-        if (derivedRestaurantId) {
-          const restaurantRes = await RestaurantService.getRestaurantById(
-            derivedRestaurantId,
-          ).catch(() => ({ success: false as const, data: undefined }));
-          if (restaurantRes.success && restaurantRes.data) {
-            setRestaurant(restaurantRes.data);
-          }
-
-          setPinConfigured(
-            window.localStorage.getItem(pinStorageKey(derivedRestaurantId)) ===
-              "true",
-          );
-        } else {
-          setPinConfigured(false);
-        }
+        const pinConfiguredRes = await RestaurantService.getPinConfigured();
+        setPinConfigured(pinConfiguredRes.success && pinConfiguredRes.data);
 
         if (!methodsRes.success && !credentialsRes.success) {
           setLoadError(
@@ -109,7 +88,7 @@ export default function AdminPaymentSettingPage() {
   }, []);
 
   const methodById = useMemo(() => {
-    return new Map(methods.map((method) => [method.id, method]));
+    return new Map(methods.map((method) => [method._id, method]));
   }, [methods]);
 
   const selectedGatewayMethod = useMemo(() => {
@@ -129,7 +108,7 @@ export default function AdminPaymentSettingPage() {
 
   useEffect(() => {
     if (!newGatewayMethodId && methods.length > 0) {
-      setNewGatewayMethodId(methods[0].id);
+      setNewGatewayMethodId(methods[0]._id);
     }
   }, [methods, newGatewayMethodId]);
 
@@ -148,6 +127,7 @@ export default function AdminPaymentSettingPage() {
       if (!response.success) {
         throw new Error(response.message || "Failed to configure PIN");
       }
+      setPinConfigured(true);
     } catch (error) {
       setPinError(
         error instanceof Error ? error.message : "Failed to configure PIN",
@@ -160,8 +140,8 @@ export default function AdminPaymentSettingPage() {
   const resetGatewayModal = () => {
     setGatewayError(null);
     setNewGatewayValues({});
-    if (methods[0]?.id) {
-      setNewGatewayMethodId(methods[0].id);
+    if (methods[0]?._id) {
+      setNewGatewayMethodId(methods[0]._id);
     }
   };
 
@@ -191,7 +171,7 @@ export default function AdminPaymentSettingPage() {
 
     try {
       const response = await PaymentService.createPaymentCredentials({
-        paymentMethodId: selectedGatewayMethod!.id,
+        paymentMethodId: selectedGatewayMethod!._id,
         isActive: true,
         credentials: credentialsPayload,
       });
@@ -234,24 +214,6 @@ export default function AdminPaymentSettingPage() {
                 Manage gateway credentials, control access with a restaurant
                 PIN, and open each gateway only when needed.
               </p>
-            </div>
-
-            <div className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-black/5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EFF7F0] text-irms-green">
-                  <Settings2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-gray-400">
-                    Restaurant
-                  </div>
-                  <div className="text-sm font-bold text-irms-text-primary">
-                    {restaurant?.name ??
-                      restaurant?.name ??
-                      "Current Workspace"}
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -427,10 +389,10 @@ export default function AdminPaymentSettingPage() {
                         setNewGatewayMethodId(event.target.value);
                         setNewGatewayValues({});
                       }}
-                      className="mt-3 w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 outline-none focus:border-irms-green focus:ring-2 focus:ring-irms-green/15"
+                      className="mt-3 w-full cursor-pointer rounded-2xl border border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-700 outline-none focus:border-irms-green focus:ring-2 focus:ring-irms-green/15"
                     >
-                      {methods.map((method) => (
-                        <option key={method.id} value={method.id}>
+                      {methods.map((method, idx) => (
+                        <option key={idx} value={method._id}>
                           {method.name}
                         </option>
                       ))}
@@ -440,15 +402,15 @@ export default function AdminPaymentSettingPage() {
                       <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-gray-400">
                         Preview
                       </div>
+                      <Image
+                        src={selectedGatewayMethod.logo}
+                        alt={selectedGatewayMethod.name}
+                        className="mt-2"
+                        width={100}
+                        height={100}
+                      />
                       <div className="mt-2 text-base font-bold text-irms-text-primary">
                         {selectedGatewayMethod.name}
-                      </div>
-                      <div className="mt-1 text-sm text-gray-500">
-                        {selectedGatewayMethod.code}
-                      </div>
-                      <div className="mt-4 text-xs leading-6 text-gray-500">
-                        Required fields are rendered from the selected payment
-                        method metadata.
                       </div>
                     </div>
                   </div>

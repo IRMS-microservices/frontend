@@ -21,7 +21,13 @@ const nextConfig: NextConfig = {
         hostname: 'images.pexels.com',
         port: '',
         pathname: '/**',
-      }
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn1.fahasa.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };

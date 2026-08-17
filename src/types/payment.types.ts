@@ -58,7 +58,7 @@ export interface CreatePaymentOrderRequest extends PaymentGatewayRequest {
 }
 
 export interface PaymentMethodResponse {
-  id: string;
+  _id: string;
   code: string;
   name: string;
   logo: string;
