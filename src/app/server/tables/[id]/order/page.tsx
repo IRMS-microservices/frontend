@@ -8,9 +8,11 @@ import { ShoppingCart, Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { MenuService } from "@/services/menu.service";
 import { OrderService } from "@/services/order.service";
+import { TableService } from "@/services/table.service";
+import { TableResponse } from "@/types/table.types";
 import { DishCategory, DishResponse } from "@/types/menuOrder.types";
 
-type Category = "APPETIZERS" | "MAIN_COURSE" | "DRINKS" | "DESSERTS";
+type Category = DishCategory;
 
 interface MenuItem {
   id: string;
@@ -44,35 +46,37 @@ export default function OrderPage({
   const router = useRouter();
 
   const [menuData, setMenuData] = useState<Record<Category, MenuItem[]>>({
-    APPETIZERS: [],
-    MAIN_COURSE: [],
-    DRINKS: [],
-    DESSERTS: [],
-  });
+    [DishCategory.APPETIZER]: [],
+    [DishCategory.MAIN_COURSE]: [],
+    [DishCategory.BEVERAGE]: [],
+    [DishCategory.DESSERT]: [],
+    [DishCategory.SIDE]: [],
+  } as Record<Category, MenuItem[]>);
   const [loading, setLoading] = useState(true);
+  const [tableInfo, setTableInfo] = useState<TableResponse | null>(null);
 
-  const [category, setCategory] = useState<Category>("APPETIZERS");
+  const [category, setCategory] = useState<Category>(DishCategory.APPETIZER);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orderNotes, setOrderNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>("0");
 
-  // Load from localStorage
+  // Load tableInfo & customerId from API
   useEffect(() => {
-    // Load Customer ID
-    const savedGuest = localStorage.getItem(`table_guest_${tableId}`);
-    if (savedGuest) {
+    const fetchTableInfo = async () => {
       try {
-        const guestData = JSON.parse(savedGuest);
-        if (guestData.customerId) {
-          setCustomerId(guestData.customerId);
+        const res = await TableService.getTable(tableId);
+        setTableInfo(res.data);
+        if (res.data?.currentGuestId) {
+          setCustomerId(res.data.currentGuestId);
         }
       } catch (e) {
-        console.error("Failed to parse guest data", e);
+        console.error("Failed to load table info", e);
       }
-    }
+    };
+    fetchTableInfo();
 
-    // Load Cart
+    // Load Cart from localStorage
     const savedCart = localStorage.getItem(`table_cart_${tableId}`);
     if (savedCart) {
       try {
@@ -98,21 +102,25 @@ export default function OrderPage({
         });
         const dishes = dishesResponse.data;
         const grouped: Record<Category, MenuItem[]> = {
-          APPETIZERS: [],
-          MAIN_COURSE: [],
-          DRINKS: [],
-          DESSERTS: [],
-        };
+          [DishCategory.APPETIZER]: [],
+          [DishCategory.MAIN_COURSE]: [],
+          [DishCategory.BEVERAGE]: [],
+          [DishCategory.DESSERT]: [],
+          [DishCategory.SIDE]: [],
+        } as Record<Category, MenuItem[]>;
 
         dishes.forEach((dish) => {
-          grouped[dish.category as Category].push({
-            id: dish._id,
-            name: dish.name,
-            price: dish.price,
-            status: dish.available ? "IN STOCK" : "SOLD OUT",
-            image: dish.image,
-            originalDish: dish,
-          });
+          const cat = dish.category as Category;
+          if (grouped[cat]) {
+            grouped[cat].push({
+              id: dish._id,
+              name: dish.name,
+              price: dish.price,
+              status: dish.available ? "IN STOCK" : "SOLD OUT",
+              image: dish.image,
+              originalDish: dish,
+            });
+          }
         });
 
         setMenuData(grouped);
@@ -204,13 +212,13 @@ export default function OrderPage({
               href={`/server/tables/${tableId}`}
               className="hover:text-irms-green"
             >
-              Table {tableId} Detail
+              Table {tableInfo?.tableNumber ?? tableId} Detail
             </Link>
             <span>›</span>
             <span className="text-irms-text-primary">Order</span>
           </nav>
           <h2 className="text-3xl font-bold text-irms-text-primary mb-1">
-            Table {tableId}
+            Table {tableInfo?.tableNumber ?? tableId}
           </h2>
           <div className="flex items-center gap-4 text-sm text-irms-text-primary mb-5">
             <span className="flex items-center gap-1">

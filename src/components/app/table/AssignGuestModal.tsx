@@ -21,7 +21,7 @@ export default function AssignGuestModal({
 }) {
   const [partySize, setPartySize] = useState(4);
   const [name, setName] = useState("");
-  const [gender, setGender] = useState("Male");
+  const [gender, setGender] = useState("MALE");
   const [phone, setPhone] = useState("");
 
   return (
@@ -114,9 +114,8 @@ export default function AssignGuestModal({
               onChange={(e) => setGender(e.target.value)}
               className="flex-1 bg-transparent text-sm text-irms-text-primary outline-none cursor-pointer"
             >
-              <option>Male</option>
-              <option>Female</option>
-              <option>Other</option>
+              <option>MALE</option>
+              <option>FEMALE</option>
             </select>
           </div>
         </div>

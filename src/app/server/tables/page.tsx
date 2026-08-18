@@ -179,7 +179,7 @@ export default function TablesPage() {
                         <span
                           className={`text-3xl font-bold ${NUM_STYLES[table.status]}`}
                         >
-                          {String(table.id).padStart(2, "0")}
+                          {String(table.tableNumber).padStart(2, "0")}
                         </span>
                         <span className="flex items-center gap-1 text-xs text-irms-text-muted">
                           <UsersRound className="w-4 h-4" />

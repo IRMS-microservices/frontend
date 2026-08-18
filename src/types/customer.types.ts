@@ -8,7 +8,7 @@ export interface CustomerResponse {
 export interface CustomerRequest {
   name: string;
   gender: string;
-  phone: string;
+  phoneNumber: string;
 }
 
 export interface CustomerQuery {

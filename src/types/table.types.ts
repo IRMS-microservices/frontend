@@ -11,6 +11,7 @@ export interface TableResponse {
   status: TableStatus;
   capacity: number;
   currentGuestsNumber?: number;
+  currentGuestId?: string | null;
   restaurantId: string;
 }
 
@@ -26,6 +27,7 @@ export interface UpdateTableRequest {
   capacity?: number;
   status?: TableStatus;
   currentGuestsNumber?: number;
+  currentGuestId?: string | null;
   customerId?: string;
 }
 

@@ -192,7 +192,7 @@ export default function TableDetailPage({
         const customerRes = await CustomerService.createCustomer({
           name: g.name,
           gender: g.gender,
-          phone: g.phone,
+          phoneNumber: g.phone,
         });
         customerId = customerRes.data.id;
 
@@ -214,6 +214,7 @@ export default function TableDetailPage({
         status: TableStatus.OCCUPIED,
         currentGuestsNumber: g.partySize,
         customerId: customerId,
+        currentGuestId: customerId ?? null,
       });
 
       setGuest(g);
@@ -232,6 +233,7 @@ export default function TableDetailPage({
         status: TableStatus.AVAILABLE,
         currentGuestsNumber: 0,
         customerId: undefined,
+        currentGuestId: null,
       });
 
       // Refresh table info
@@ -352,8 +354,10 @@ export default function TableDetailPage({
                   />
                 </div>
                 <h3 className="text-xl font-bold text-irms-text-primary mb-8">
-                  <span className="text-irms-green">Table {tableId}</span> has
-                  been assigned to the customer
+                  <span className="text-irms-green">
+                    Table {tableInfo?.tableNumber}
+                  </span>{" "}
+                  has been assigned to the customer
                 </h3>
 
                 <div className="w-full max-w-lg flex gap-3">
