@@ -16,6 +16,8 @@ export default function AdminInventoryPage() {
   const [lowStock, setLowStock] = useState<string[]>([]);
   const [critical, setCritical] = useState<string[]>([]);
 
+  const getInventoryId = (item: InventoryResponse & { _id?: string }) =>
+    String(item.id ?? item._id ?? "");
   const loadInventory = async () => {
     try {
       const response = await InventoryService.listInventories({
@@ -38,7 +40,7 @@ export default function AdminInventoryPage() {
     const unsubscribe = InventoryService.onQuantityUpdated((payload) => {
       setInventoryItems((prevItems) => {
         const existingItemIndex = prevItems.findIndex(
-          (item) => item.id === payload.id,
+          (item) => getInventoryId(item) === payload.id,
         );
         let newItems = [...prevItems];
         if (existingItemIndex > -1) {
@@ -55,14 +57,14 @@ export default function AdminInventoryPage() {
             payload.quantity > 0 &&
             payload.quantity <= payload.warningThreshold
           ) {
-            setLowStock((prev) => [...prev, updatedItem.id]);
+            setLowStock((prev) => [...prev, getInventoryId(updatedItem)]);
           } else {
-            setLowStock((prev) => prev.filter((id) => id !== updatedItem.id));
+            setLowStock((prev) => prev.filter((id) => id !== getInventoryId(updatedItem)));
           }
           if (payload.quantity === 0) {
-            setCritical((prev) => [...prev, updatedItem.id]);
+            setCritical((prev) => [...prev, getInventoryId(updatedItem)]);
           } else {
-            setCritical((prev) => prev.filter((id) => id !== updatedItem.id));
+            setCritical((prev) => prev.filter((id) => id !== getInventoryId(updatedItem)));
           }
         } else {
           newItems.unshift(payload as any);
@@ -255,9 +257,9 @@ export default function AdminInventoryPage() {
 
               return (
                 <div
-                  key={item.id || index}
+                  key={getInventoryId(item) || index}
                   onClick={() => handleEditItem(item)}
-                  className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-500 cursor-pointer flex flex-col h-full relative group ${animatedItemId === item.id ? "bg-green-50 scale-[1.02] shadow-md ring-2 ring-irms-green ring-opacity-50" : ""}`}
+                  className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-500 cursor-pointer flex flex-col h-full relative group ${animatedItemId === getInventoryId(item) ? "bg-green-50 scale-[1.02] shadow-md ring-2 ring-irms-green ring-opacity-50" : ""}`}
                 >
                   <div className="flex justify-between items-start mb-3">
                     {status === "optimal" && (
@@ -341,3 +343,4 @@ export default function AdminInventoryPage() {
     </div>
   );
 }
+

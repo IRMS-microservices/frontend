@@ -55,3 +55,4 @@ export interface InventoryUpdatePayload {
     createdAt?: string;
     updatedAt?: string;
 }
+

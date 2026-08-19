@@ -125,11 +125,14 @@ export default function TableDetailPage({
             o.serviceStatus === ServiceStatus.EATING,
         );
 
+        const currentGuestId =
+          currentActiveOrder?.customerId ?? tableData?.currentGuestId ?? null;
+
         let customerData = null;
-        if (currentActiveOrder?.customerId) {
+        if (currentGuestId) {
           try {
             const customerRes = await CustomerService.getCustomerById(
-              currentActiveOrder.customerId,
+              currentGuestId,
             );
             customerData = customerRes.data;
           } catch (e) {
@@ -141,34 +144,23 @@ export default function TableDetailPage({
           if (currentActiveOrder) setActiveOrder(currentActiveOrder);
           setTableState("assigned");
 
-          let localGuest = null;
-          try {
-            const saved = localStorage.getItem(`table_guest_${tableId}`);
-            if (saved) localGuest = JSON.parse(saved);
-          } catch (e) {}
+          const customerDisplay = customerData
+            ? customerData.gender === "Male"
+              ? "Mr. " + customerData.name
+              : "Ms. " + customerData.name
+            : null;
 
-          // ← removed !guest guard, always set from fresh fetch
-          if (localGuest && !currentActiveOrder) {
-            setGuest(localGuest);
-          } else {
-            const customerDisplay = customerData
-              ? customerData.gender === "Male"
-                ? `Mr. ${customerData.name}`
-                : `Ms. ${customerData.name}`
-              : null;
-
-            setGuest({
-              name:
-                customerDisplay ||
-                (currentActiveOrder?.note
-                  ? `Note: ${currentActiveOrder.note}`
-                  : `Guest #${currentActiveOrder?.customerId || "Walk-in"}`),
-              gender: customerData?.gender || "N/A",
-              phone: customerData?.phone || "N/A",
-              partySize: tableData?.currentGuestsNumber || 0,
-              preference: "N/A",
-            });
-          }
+          setGuest({
+            name:
+              customerDisplay ||
+              (currentActiveOrder?.note
+                ? `Note: ${currentActiveOrder.note}`
+                : `Guest #${currentGuestId || "Walk-in"}`),
+            gender: customerData?.gender || "N/A",
+            phone: customerData?.phone || "N/A",
+            partySize: tableData?.currentGuestsNumber || 0,
+            preference: "N/A",
+          });
         } else {
           setActiveOrder(null);
           setTableState("empty");
@@ -195,18 +187,8 @@ export default function TableDetailPage({
           phoneNumber: g.phone,
         });
         customerId = customerRes.data._id;
-
-        // Save to localStorage immediately
-        localStorage.setItem(
-          `table_guest_${tableId}`,
-          JSON.stringify({
-            ...g,
-            customerId: customerId,
-          }),
-        );
       } catch (err) {
         console.error("Failed to create customer:", err);
-        localStorage.setItem(`table_guest_${tableId}`, JSON.stringify(g));
       }
 
       // 2. Assign table with customer info
@@ -237,8 +219,6 @@ export default function TableDetailPage({
       // Refresh table info
       const tableRes = await TableService.getTable(tableId);
       setTableInfo(tableRes.data);
-
-      localStorage.removeItem(`table_guest_${tableId}`);
       localStorage.removeItem(`table_cart_${tableId}`);
 
       setTableState("empty");
@@ -469,3 +449,4 @@ export default function TableDetailPage({
     </div>
   );
 }
+

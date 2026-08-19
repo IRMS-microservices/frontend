@@ -5,12 +5,14 @@ import Link from "next/link";
 import { JSX, useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { OrderService } from "@/services/order.service";
+import { KitchenService } from "@/services/kitchen.service";
 import {
   OrderResponse,
   PaymentStatus,
   ServiceStatus,
 } from "@/types/menuOrder.types";
 import { CustomerService } from "@/services/customer.service";
+import { CookingStatus, KitchenOrderItemResponse, KitchenOrderResponse } from "@/types/kitchen.types";
 import { PaymentService } from "@/services/payment.service";
 import { getPaymentAdapterUI } from "./adapters/PaymentAdapterRegistry";
 import { TableResponse } from "@/types/table.types";
@@ -25,6 +27,8 @@ type PaymentMethodItem = {
 
 const STATUS_STYLES: Record<string, string> = {
   SERVED: "text-green-600",
+  READY: "text-green-600",
+  COOKING: "text-amber-500",
   WAITING: "text-[#9ca3af]",
 };
 
@@ -41,6 +45,35 @@ const STATUS_ICONS: Record<string, JSX.Element> = {
       strokeLinejoin="round"
     >
       <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+  READY: (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+  COOKING: (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="1 4 1 10 7 10" />
+      <path d="M3.51 15a9 9 0 1 0 .49-3.67" />
     </svg>
   ),
   WAITING: (
@@ -81,6 +114,7 @@ export default function PaymentPage({
   );
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [tableInfo, setTableInfo] = useState<TableResponse | null>(null);
+  const [kitchenOrder, setKitchenOrder] = useState<KitchenOrderResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -102,21 +136,32 @@ export default function PaymentPage({
     };
     fetchOrder();
   }, [tableId]);
+  useEffect(() => {
+    const fetchKitchenOrder = async () => {
+      if (!activeOrder?._id) {
+        setKitchenOrder(null);
+        return;
+      }
+
+      try {
+        const response = await KitchenService.listOrders({
+          orderId: activeOrder._id,
+          limit: 1,
+        });
+        setKitchenOrder(response.data?.[0] ?? null);
+      } catch (err) {
+        console.error("Failed to fetch kitchen order", err);
+        setKitchenOrder(null);
+      }
+    };
+
+    fetchKitchenOrder();
+  }, [activeOrder?._id]);
+
 
   useEffect(() => {
     const fetchCustomer = async () => {
-      let cid = activeOrder?.customerId;
-
-      // Fallback to localStorage if no activeOrder or no customerId in activeOrder
-      if (!cid && typeof window !== "undefined") {
-        try {
-          const saved = localStorage.getItem(`table_guest_${tableId}`);
-          if (saved) {
-            const localGuest = JSON.parse(saved);
-            cid = localGuest.customerId;
-          }
-        } catch (e) {}
-      }
+      let cid = activeOrder?.customerId ?? tableInfo?.currentGuestId ?? null;
 
       setDisplayCustomerId(cid || null);
 
@@ -141,7 +186,39 @@ export default function PaymentPage({
       }
     };
     fetchCustomer();
-  }, [activeOrder, tableId]);
+  }, [activeOrder, tableId, tableInfo?.currentGuestId]);
+
+  useEffect(() => {
+    if (!activeOrder?._id) return;
+
+    KitchenService.connect();
+
+    const unsubscribeItemCompleted = KitchenService.onItemCompleted(
+      (completedItem: KitchenOrderItemResponse & { orderId?: string }) => {
+        if (completedItem.orderId && String(completedItem.orderId) !== String(activeOrder._id)) {
+          return;
+        }
+
+        setKitchenOrder((prev) => {
+          if (!prev) return prev;
+
+          return {
+            ...prev,
+            items: prev.items.map((item) =>
+              String(item.id) === String(completedItem.id)
+                ? { ...item, ...completedItem }
+                : item,
+            ),
+          };
+        });
+      },
+    );
+
+    return () => {
+      unsubscribeItemCompleted();
+      KitchenService.disconnect();
+    };
+  }, [activeOrder?._id]);
 
   useEffect(() => {
     const fetchMethods = async () => {
@@ -256,6 +333,38 @@ export default function PaymentPage({
   const serviceCharge = subtotal * 0.18;
   const tax = subtotal * 0.08;
   const grandTotal = subtotal + serviceCharge + tax;
+  const findKitchenItemForOrderItem = (
+    item: OrderResponse["items"][number],
+  ) => {
+    if (!kitchenOrder) return null;
+
+    return (
+      kitchenOrder.items.find(
+        (kitchenItem) =>
+          kitchenItem.dishId === item.dishId &&
+          kitchenItem.quantity === item.quantity &&
+          (kitchenItem.notes || "") === (item.notes || ""),
+      ) ?? null
+    );
+  };
+
+  const getItemStatus = (item: OrderResponse["items"][number]) => {
+    if (activeOrder?.serviceStatus === ServiceStatus.FINISHED) {
+      return "SERVED";
+    }
+
+    const kitchenItem = findKitchenItemForOrderItem(item);
+    if (!kitchenItem) {
+      return activeOrder?.serviceStatus === ServiceStatus.WAITING
+        ? "WAITING"
+        : "COOKING";
+    }
+
+    return kitchenItem.cookingStatus === CookingStatus.COMPLETED
+      ? "READY"
+      : "COOKING";
+  };
+
 
   const handleCompletePaymentClick = () => {
     if (!activeOrder) return;
@@ -352,10 +461,7 @@ export default function PaymentPage({
 
               <div className="space-y-4">
                 {activeOrder.items.map((item, idx) => {
-                  const itemStatus =
-                    activeOrder.serviceStatus === ServiceStatus.WAITING
-                      ? ServiceStatus.WAITING
-                      : ServiceStatus.FINISHED;
+                  const itemStatus = getItemStatus(item);
                   return (
                     <div
                       key={item._id}
@@ -380,9 +486,9 @@ export default function PaymentPage({
                         )}
                       </div>
                       <div
-                        className={`flex items-center gap-1 text-xs font-semibold ${STATUS_STYLES[itemStatus]}`}
+                        className={`flex items-center gap-1 text-xs font-semibold ${STATUS_STYLES[itemStatus] ?? "text-irms-text-secondary"}`}
                       >
-                        {STATUS_ICONS[itemStatus]}
+                        {STATUS_ICONS[itemStatus] ?? STATUS_ICONS.WAITING}
                         {itemStatus}
                       </div>
                       <span className="text-sm font-bold text-irms-text-primary w-32 text-right">
@@ -600,3 +706,5 @@ export default function PaymentPage({
     </div>
   );
 }
+
+

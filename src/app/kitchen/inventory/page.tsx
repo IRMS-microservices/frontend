@@ -29,6 +29,8 @@ export default function KitchenInventoryPage() {
   const [animatedItemId, setAnimatedItemId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
+  const getInventoryId = (item: InventoryResponse & { _id?: string }) =>
+    String(item.id ?? item._id ?? "");
   const loadInventory = async () => {
     try {
       const response = await InventoryService.listInventories({
@@ -50,7 +52,7 @@ export default function KitchenInventoryPage() {
     InventoryService.connect();
     const unsubscribe = InventoryService.onQuantityUpdated((payload) => {
       setInventoryItems((prevItems) => {
-        const idx = prevItems.findIndex((item) => item.id === payload.id);
+        const idx = prevItems.findIndex((item) => getInventoryId(item) === payload.id);
         const newItems = [...prevItems];
         if (idx > -1) {
           const updatedItem: InventoryResponse = {
@@ -131,11 +133,11 @@ export default function KitchenInventoryPage() {
           <div className="grid grid-cols-4 gap-6">
             {filtered.map((item, index) => {
               const status = getStatus(item);
-              const isAnimated = animatedItemId === item.id;
+              const isAnimated = animatedItemId === getInventoryId(item);
 
               return (
                 <div
-                  key={item.id || index}
+                  key={getInventoryId(item) || index}
                   className={`bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between transition-all duration-500 ${
                     isAnimated
                       ? "bg-green-50 scale-[1.02] shadow-md ring-2 ring-irms-green ring-opacity-50"
@@ -235,3 +237,5 @@ export default function KitchenInventoryPage() {
     </div>
   );
 }
+
+

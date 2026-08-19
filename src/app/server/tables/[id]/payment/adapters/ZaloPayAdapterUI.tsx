@@ -11,18 +11,24 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({
 }) => {
   const [isPolling, setIsPolling] = useState(true);
   const [transactionId, setTransactionId] = useState<string | null>(null);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [qrValue, setQrValue] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const createOrder = async () => {
       try {
+        setLoading(true);
+        setError(null);
+        setQrImageUrl(null);
+        setQrValue(null);
+        setTransactionId(null);
+
         const amount = order.items.reduce(
           (sum, item) => sum + item.price * item.quantity,
           0,
         );
-        // Add service charge and tax
         const serviceCharge = amount * 0.18;
         const tax = amount * 0.08;
         const grandTotal = amount + serviceCharge + tax;
@@ -35,8 +41,18 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({
           restaurantId: order.restaurantId,
         });
 
-        if (res.success && res.data?.paymentUrl) {
-          setQrCodeUrl(res.data.paymentUrl);
+        if (res.success && res.data) {
+          if (res.data.qrCode) {
+            setQrImageUrl(res.data.qrCode);
+          } else if (res.data.paymentUrl) {
+            setQrValue(res.data.paymentUrl);
+          } else {
+            setError(
+              res.data.rawResponse?.toString() ||
+                "Failed to create ZaloPay order",
+            );
+          }
+
           if (res.data.transactionId) {
             setTransactionId(res.data.transactionId);
           }
@@ -72,7 +88,6 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({
               setIsPolling(false);
               onSuccess();
             } else if (!res.data.isProcessing && !res.data.isPaid) {
-              // Not processing and not paid implies failure
               setIsPolling(false);
               setError("Payment failed or was cancelled.");
             }
@@ -93,8 +108,14 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({
           <span className="text-gray-400">Loading QR...</span>
         ) : error ? (
           <span className="text-red-500 text-sm text-center px-4">{error}</span>
-        ) : qrCodeUrl ? (
-          <QRCodeSVG value={qrCodeUrl} size={192} />
+        ) : qrImageUrl ? (
+          <img
+            src={qrImageUrl}
+            alt="ZaloPay QR"
+            className="w-full h-full object-contain p-2"
+          />
+        ) : qrValue ? (
+          <QRCodeSVG value={qrValue} size={192} />
         ) : (
           <span className="text-gray-400">QR Code Scanner</span>
         )}

@@ -81,14 +81,16 @@ export default function TablesPage() {
               status = TableStatus.AVAILABLE;
           }
 
-          const customer = activeOrder
-            ? customers?.find((c) => c._id === activeOrder.customerId)
+          const customerId = activeOrder?.customerId ?? bt.currentGuestId;
+          const customer = customerId
+            ? customers?.find((c) => c._id === customerId)
             : null;
 
-          const customerDisplay =
-            customer?.gender === "Male"
-              ? `Mr. ${customer?.name}`
-              : `Ms. ${customer?.name}`;
+          const customerDisplay = customer
+            ? customer.gender === "Male"
+              ? "Mr. " + customer.name
+              : "Ms. " + customer.name
+            : null;
 
           const startTime = new Date(activeOrder?.createdAt || "");
           const now = new Date();
@@ -98,26 +100,6 @@ export default function TablesPage() {
           const timeString =
             diffHours > 0 ? `${diffHours}h ${diffMins}m` : `${diffMins}m`;
 
-          let localGuestDisplay = null;
-          if (!activeOrder && typeof window !== "undefined") {
-            try {
-              const saved = localStorage.getItem(
-                `table_guest_${bt.tableNumber}`,
-              );
-              if (saved) {
-                const lg = JSON.parse(saved);
-                if (lg.name) {
-                  localGuestDisplay =
-                    lg.gender === "Male"
-                      ? `Mr. ${lg.name}`
-                      : lg.gender === "Female"
-                        ? `Ms. ${lg.name}`
-                        : lg.name;
-                }
-              }
-            } catch (e) {}
-          }
-
           return {
             id: bt.id,
             tableNumber: bt.tableNumber,
@@ -125,13 +107,7 @@ export default function TablesPage() {
             seatedGuests: bt.currentGuestsNumber,
             status: status,
             time: activeOrder ? timeString : "",
-            guest: customer
-              ? customerDisplay
-              : localGuestDisplay
-                ? localGuestDisplay
-                : activeOrder
-                  ? "Active Order"
-                  : "Ready for Service",
+            guest: customerDisplay ?? (activeOrder ? "Active Order" : "Ready for Service"),
             hasAlert: bt.status === "WAITING",
           };
         });
@@ -286,3 +262,6 @@ export default function TablesPage() {
     </div>
   );
 }
+
+
+
