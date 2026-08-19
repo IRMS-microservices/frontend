@@ -53,7 +53,7 @@ export function InventoryItemPanel({ isOpen, onClose, mode, item, onSuccess }: I
         let delta = Number(quantity) - Number(item.quantity || 0);
         if (delta !== 0) {
           await InventoryService.adjustQuantity({
-            name: item.name,
+            id: String(item.id ?? item._id ?? ""),
             delta: delta,
             unit: unit as any,
             reason: 'IMPORT'

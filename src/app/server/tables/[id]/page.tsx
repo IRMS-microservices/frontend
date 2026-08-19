@@ -194,7 +194,7 @@ export default function TableDetailPage({
           gender: g.gender,
           phoneNumber: g.phone,
         });
-        customerId = customerRes.data.id;
+        customerId = customerRes.data._id;
 
         // Save to localStorage immediately
         localStorage.setItem(
@@ -213,7 +213,6 @@ export default function TableDetailPage({
       await TableService.updateTable(tableId, {
         status: TableStatus.OCCUPIED,
         currentGuestsNumber: g.partySize,
-        customerId: customerId,
         currentGuestId: customerId ?? null,
       });
 
@@ -232,7 +231,6 @@ export default function TableDetailPage({
       await TableService.updateTable(tableId, {
         status: TableStatus.AVAILABLE,
         currentGuestsNumber: 0,
-        customerId: undefined,
         currentGuestId: null,
       });
 

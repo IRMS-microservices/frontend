@@ -19,7 +19,7 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({
     const createOrder = async () => {
       try {
         const amount = order.items.reduce(
-          (sum, item) => sum + item.salePrice * item.quantity,
+          (sum, item) => sum + item.price * item.quantity,
           0,
         );
         // Add service charge and tax
@@ -28,9 +28,9 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({
         const grandTotal = amount + serviceCharge + tax;
 
         const res = await PaymentService.createPaymentOrder({
-          orderId: order.id.toString(),
+          orderId: order._id,
           amount: grandTotal,
-          description: `Thanh toan don hang #${order.id}`,
+          description: `Thanh toan don hang #${order._id}`,
           paymentMethodId,
           restaurantId: order.restaurantId,
         });

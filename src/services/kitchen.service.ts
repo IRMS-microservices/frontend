@@ -16,7 +16,7 @@ const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 let kitchenSocket: Socket | null = null;
 
 function getKitchenSocket(): Socket {
-    if (!kitchenSocket || !kitchenSocket.connected) {
+    if (!kitchenSocket) {
         const token = sessionStorage.getItem('token');
         kitchenSocket = io(GATEWAY_URL, {
             // Tell Socket.IO client to use the gateway-prefixed path
@@ -159,7 +159,7 @@ export const KitchenService = {
      * Emitted by the backend (room:chef) when tickets are updated.
      */
     onTicketUpdate(
-        callback: (tickets: KitchenOrderResponse[]) => void
+        callback: (tickets: any[]) => void
     ): () => void {
         const s = getKitchenSocket();
         s.on('ticket:update', callback);
@@ -193,16 +193,40 @@ export const KitchenService = {
     /**
      * Emit bump kitchen item event via Socket.IO
      */
-    bumpItem(kitchenItemId: string, updateData: any): void {
+    bumpItem(kitchenItemId: string, updateData: any): Promise<void> {
         const s = getKitchenSocket();
-        s.emit('bump_kitchen_item', { id: kitchenItemId, update: updateData });
+        return new Promise((resolve, reject) => {
+            s.emit(
+                'bump_kitchen_item',
+                { id: kitchenItemId, update: updateData },
+                (response: { success?: boolean; message?: string; error?: string } = {}) => {
+                    if (response?.success === false) {
+                        reject(new Error(response.error || response.message || 'Failed to bump kitchen item'));
+                        return;
+                    }
+                    resolve();
+                },
+            );
+        });
     },
 
     /**
      * Emit bump kitchen order event via Socket.IO
      */
-    bumpOrder(kitchenOrderId: string, updateData: any): void {
+    bumpOrder(kitchenOrderId: string, updateData: any): Promise<void> {
         const s = getKitchenSocket();
-        s.emit('bump_kitchen_order', { id: kitchenOrderId, update: updateData });
+        return new Promise((resolve, reject) => {
+            s.emit(
+                'bump_kitchen_order',
+                { id: kitchenOrderId, update: updateData },
+                (response: { success?: boolean; message?: string; error?: string } = {}) => {
+                    if (response?.success === false) {
+                        reject(new Error(response.error || response.message || 'Failed to bump kitchen order'));
+                        return;
+                    }
+                    resolve();
+                },
+            );
+        });
     },
 };

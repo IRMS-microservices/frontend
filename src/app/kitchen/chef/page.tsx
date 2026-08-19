@@ -1,7 +1,7 @@
 "use client";
 
 import { Topbar } from "@/components/shared/Topbar";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { KitchenService } from "@/services/kitchen.service";
 import { CookingStatus, KitchenOrderResponse } from "@/types/kitchen.types";
 import useElapsed from "@/hooks/useElapsed";
@@ -15,11 +15,18 @@ import useElapsed from "@/hooks/useElapsed";
  * Each ticket represents one grouped dish across tables.
  * The backend sends the already-grouped array — no client-side grouping needed.
  */
+interface TicketRow {
+  tableId: string;
+  tableNumber: number;
+  kitchenOrderItemId: string;
+  quantity: number;
+}
+
 interface Ticket {
-  key: string; // unique key derived from the order for React
+  key: string; // dish name + fire-time bucket
   dishName: string;
   groupFireTimeMs: number;
-  rows: { tableId: string | number; kitchenItemId: string; quantity: number }[];
+  rows: TicketRow[];
   totalQty: number;
   station?: string;
   bumped: boolean;
@@ -34,6 +41,8 @@ const STATIONS: Station[] = [
   "FRYER",
   "DESSERT",
 ];
+
+const THREE_MINUTES_MS = 3 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Helper: map KitchenOrderResponse[] (from initial REST load) into Ticket[]
@@ -55,28 +64,57 @@ function parseFireTime(fireTime: any): number {
   return Date.now();
 }
 
+function getKitchenItemId(
+  item: KitchenOrderResponse["items"][number] & { _id?: string },
+): string {
+  return String(item.id ?? item._id ?? "");
+}
+
 function ordersToTickets(orders: KitchenOrderResponse[]): Ticket[] {
-  const tickets: Ticket[] = [];
+  const map = new Map<string, Ticket>();
+
   for (const order of orders) {
     const fireMs = parseFireTime(order.fireTime);
+    const bucketMs = Math.floor(fireMs / THREE_MINUTES_MS) * THREE_MINUTES_MS;
+
     for (const item of order.items) {
-      tickets.push({
-        key: `${order.id}-${item.id}`,
-        dishName: item.dishName,
-        groupFireTimeMs: fireMs,
-        rows: [
-          {
-            tableId: order.orderId,
-            kitchenItemId: String(item.id),
-            quantity: item.quantity,
-          },
-        ],
-        totalQty: item.quantity,
-        bumped: false,
-      });
+      if (item.cookingStatus === CookingStatus.COMPLETED) {
+        continue;
+      }
+
+      const kitchenOrderItemId = getKitchenItemId(
+        item as KitchenOrderResponse["items"][number] & { _id?: string },
+      );
+      if (!kitchenOrderItemId) {
+        continue;
+      }
+
+      const key = `${item.dishName}-${bucketMs}`;
+      const row: TicketRow = {
+        tableId: String(order.tableId),
+        tableNumber: order.tableNumber,
+        kitchenOrderItemId,
+        quantity: item.quantity,
+      };
+
+      const existing = map.get(key);
+      if (existing && !existing.bumped) {
+        existing.rows.push(row);
+        existing.totalQty += item.quantity;
+      } else {
+        map.set(key, {
+          key,
+          dishName: item.dishName,
+          groupFireTimeMs: fireMs,
+          rows: [row],
+          totalQty: item.quantity,
+          bumped: false,
+        });
+      }
     }
   }
-  return tickets;
+
+  return Array.from(map.values());
 }
 
 /**
@@ -84,17 +122,42 @@ function ordersToTickets(orders: KitchenOrderResponse[]): Ticket[] {
  * If a ticket key already exists (and hasn't been bumped), overwrite it;
  * if it's new, append it.
  */
-function mergeTickets(
-  prev: Ticket[],
-  incoming: KitchenOrderResponse[],
-): Ticket[] {
-  const incomingTickets = ordersToTickets(incoming);
+function mergeTickets(prev: Ticket[], incoming: Ticket[]): Ticket[] {
   const map = new Map(prev.map((t) => [t.key, t]));
-  for (const t of incomingTickets) {
-    if (!map.get(t.key)?.bumped) {
-      map.set(t.key, t);
+
+  for (const ticket of incoming) {
+    const existing = map.get(ticket.key);
+    if (!existing) {
+      map.set(ticket.key, {
+        ...ticket,
+        rows: [...ticket.rows],
+      });
+      continue;
     }
+
+    if (existing.bumped) {
+      continue;
+    }
+
+    const rowMap = new Map(
+      existing.rows.map((row) => [row.kitchenOrderItemId, row]),
+    );
+    for (const row of ticket.rows) {
+      if (!rowMap.has(row.kitchenOrderItemId)) {
+        rowMap.set(row.kitchenOrderItemId, row);
+      }
+    }
+
+    const rows = Array.from(rowMap.values());
+    map.set(ticket.key, {
+      ...existing,
+      ...ticket,
+      rows,
+      totalQty: rows.reduce((sum, row) => sum + row.quantity, 0),
+      bumped: existing.bumped || ticket.bumped,
+    });
   }
+
   return Array.from(map.values());
 }
 
@@ -133,11 +196,11 @@ function TicketCard({
       <div className="space-y-2 mb-4 mt-3">
         {ticket.rows.map((row) => (
           <div
-            key={`${row.tableId}-${row.kitchenItemId}`}
+            key={`${row.tableId}-${row.kitchenOrderItemId}`}
             className="flex items-center justify-between bg-[#f9fafb] rounded-lg px-3 py-1.5"
           >
             <span className="text-sm font-semibold text-[#374151]">
-              Order #{String(row.tableId).padStart(2, "0")}
+              Table #{String(row.tableNumber).padStart(2, "0")}
             </span>
             <span className="text-sm font-semibold text-[#374151]">
               ×{row.quantity}
@@ -272,7 +335,7 @@ export default function ChefViewPage() {
     }
 
     const unsubscribe = KitchenService.onTicketUpdate(
-      (incoming: KitchenOrderResponse[]) => {
+      (incoming: Ticket[]) => {
         setTickets((prev) => mergeTickets(prev, incoming));
       },
     );
@@ -289,13 +352,15 @@ export default function ChefViewPage() {
   const handleBump = useCallback(async (ticket: Ticket) => {
     setBumpingKeys((prev) => new Set(prev).add(ticket.key));
     try {
-      ticket.rows.forEach((row) =>
-        KitchenService.bumpItem(String(row.kitchenItemId), {
-          cookingStatus: CookingStatus.COMPLETED,
-        }),
+      await Promise.all(
+        ticket.rows.map((row) =>
+          KitchenService.bumpItem(String(row.kitchenOrderItemId), {
+            cookingStatus: CookingStatus.COMPLETED,
+          }),
+        ),
       );
       setTickets((prev) =>
-        prev.map((t) => (t.key === ticket.key ? { ...t, bumped: true } : t)),
+        prev.filter((t) => t.key !== ticket.key),
       );
     } catch (err) {
       console.error("Bump failed", err);

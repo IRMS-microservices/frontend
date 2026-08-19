@@ -33,6 +33,8 @@ export interface KitchenOrderResponse {
     orderId: string;
     status: KitchenOrderStatus;
     fireTime: string;
+    tableId: string;
+    tableNumber: number;
     items: KitchenOrderItemResponse[];
 }
 

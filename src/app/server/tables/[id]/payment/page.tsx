@@ -13,6 +13,8 @@ import {
 import { CustomerService } from "@/services/customer.service";
 import { PaymentService } from "@/services/payment.service";
 import { getPaymentAdapterUI } from "./adapters/PaymentAdapterRegistry";
+import { TableResponse } from "@/types/table.types";
+import { TableService } from "@/services/table.service";
 
 type PaymentMethodItem = {
   id: string;
@@ -78,6 +80,7 @@ export default function PaymentPage({
     null,
   );
   const [customerName, setCustomerName] = useState<string | null>(null);
+  const [tableInfo, setTableInfo] = useState<TableResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -87,7 +90,7 @@ export default function PaymentPage({
         const response = await OrderService.getOrders({ tableId });
         const orders = response.data;
         // Find active order (Waiting or Eating)
-        const currentActiveOrder = orders?.data?.find(
+        const currentActiveOrder = orders?.find(
           (o) => o.serviceStatus === "WAITING" || o.serviceStatus === "EATING",
         );
         setActiveOrder(currentActiveOrder || null);
@@ -161,10 +164,12 @@ export default function PaymentPage({
 
           const supported = creds
             .map((cred) => {
-              const method = methods.find((m) => m.id === cred.paymentMethodId);
+              const method = methods.find(
+                (m) => m._id === cred.paymentMethodId,
+              );
               if (method && method.isActive) {
                 return {
-                  id: method.id,
+                  id: method._id,
                   code: method.code,
                   name: method.name,
                   logo: method.logo,
@@ -195,6 +200,20 @@ export default function PaymentPage({
     fetchMethods();
   }, []);
 
+  useEffect(() => {
+    const fetchTableInfo = async () => {
+      try {
+        const response = await TableService.getTable(tableId);
+        if (response.success) {
+          setTableInfo(response.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch table info", err);
+      }
+    };
+    fetchTableInfo();
+  }, [tableId]);
+
   // ── Real-time: listen for service-status changes from the kitchen ──
   useEffect(() => {
     OrderService.connect();
@@ -205,7 +224,7 @@ export default function PaymentPage({
         if (updatedOrder.tableId !== tableId) return;
 
         setActiveOrder((prev) => {
-          if (prev && prev.id === updatedOrder.id) {
+          if (prev && prev._id === updatedOrder._id) {
             return { ...prev, ...updatedOrder };
           }
           // If no active order yet, pick up this one if it's in a relevant status
@@ -229,7 +248,7 @@ export default function PaymentPage({
 
   const subtotal = activeOrder
     ? activeOrder.items.reduce(
-        (sum, item) => sum + item.salePrice * item.quantity,
+        (sum, item) => sum + item.price * item.quantity,
         0,
       )
     : 0;
@@ -248,7 +267,7 @@ export default function PaymentPage({
     setIsProcessing(true);
     setShowPopup(false);
     try {
-      await OrderService.updateOrder(activeOrder.id.toString(), {
+      await OrderService.updateOrder(activeOrder._id.toString(), {
         serviceStatus: ServiceStatus.FINISHED,
         paymentStatus: PaymentStatus.PAID,
       });
@@ -287,14 +306,14 @@ export default function PaymentPage({
               href={`/server/tables/${tableId}`}
               className="hover:text-irms-green"
             >
-              Table {tableId} Detail
+              Table {tableInfo?.tableNumber} Detail
             </Link>
             <span>›</span>
             <span className="text-irms-text-primary">Payment</span>
           </nav>
 
           <h2 className="text-4xl font-bold text-irms-text-primary mb-2">
-            Table {tableId}
+            Table {tableInfo?.tableNumber}
           </h2>
           <div className="flex items-center gap-3 text-sm text-irms-text-muted mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
@@ -323,7 +342,7 @@ export default function PaymentPage({
             <div className="bg-white rounded-2xl border border-irms-border p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-bold text-irms-text-primary">
-                  Order Details (ID: #{activeOrder.id})
+                  Order Details (ID: #{activeOrder._id})
                 </h3>
                 <span className="text-xs font-bold text-irms-text-muted tracking-widest">
                   {activeOrder.items.reduce((s, i) => s + i.quantity, 0)} ITEMS
@@ -339,7 +358,7 @@ export default function PaymentPage({
                       : ServiceStatus.FINISHED;
                   return (
                     <div
-                      key={item.id}
+                      key={item._id}
                       className="flex items-center gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0"
                     >
                       <div className="w-8 h-8 rounded-lg bg-irms-bg-secondary flex items-center justify-center text-sm font-bold text-irms-text-primary shrink-0">
@@ -367,13 +386,10 @@ export default function PaymentPage({
                         {itemStatus}
                       </div>
                       <span className="text-sm font-bold text-irms-text-primary w-32 text-right">
-                        {(item.salePrice * item.quantity).toLocaleString(
-                          "vi-VN",
-                          {
-                            style: "currency",
-                            currency: "VND",
-                          },
-                        )}
+                        {(item.price * item.quantity).toLocaleString("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        })}
                       </span>
                     </div>
                   );

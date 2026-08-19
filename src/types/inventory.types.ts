@@ -28,7 +28,7 @@ export interface UpdateInventoryRequest {
 }
 
 export interface AdjustInventoryQuantityRequest {
-    name: string;
+    id: string;
     delta: number;
     unit: EUnit;
     reason: 'IMPORT' | 'SALE'
@@ -45,7 +45,8 @@ export interface InventoryQuery {
 }
 
 export interface InventoryUpdatePayload {
-    id: string;
+    _id: string;
+    id?: string;
     name: string;
     quantity: number;
     unit: EUnit;

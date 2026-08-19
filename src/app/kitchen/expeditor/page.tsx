@@ -10,14 +10,24 @@ import {
   CookingStatus,
   KitchenOrderStatus,
 } from "@/types/kitchen.types";
-import { ServiceStatus } from "@/types/menuOrder.types";
+import { OrderResponse, ServiceStatus } from "@/types/menuOrder.types";
 
 interface Ticket {
   kitchenOrderId: string;
   orderId: string;
   tableId: string;
+  tableNumber: number;
   fireTime: string;
   items: KitchenOrderItemResponse[];
+}
+
+function getItemIdentifier(item: KitchenOrderItemResponse & { _id?: string }) {
+  return String(item.id ?? item._id ?? "");
+}
+
+function isTicketReady(ticket: Ticket) {
+  return ticket.items.length > 0 &&
+    ticket.items.every((item) => item.cookingStatus === CookingStatus.COMPLETED);
 }
 
 export default function ExpeditorViewPage() {
@@ -29,13 +39,24 @@ export default function ExpeditorViewPage() {
   const orderIdToTableIdRef = useRef<Map<string, string>>(new Map());
 
   const buildTicket = useCallback(
-    (ko: KitchenOrderResponse, tableId: string): Ticket => ({
-      kitchenOrderId: ko.id,
-      orderId: ko.orderId,
-      tableId,
-      fireTime: ko.fireTime,
-      items: ko.items,
-    }),
+    (
+      ko: KitchenOrderResponse,
+      tableId: string,
+      tableNumber: number,
+    ): Ticket => {
+      const kitchenOrderId = String(
+        (ko as KitchenOrderResponse & { _id?: string })._id ?? ko.id ?? "",
+      );
+
+      return {
+        kitchenOrderId,
+        orderId: ko.orderId,
+        tableId,
+        tableNumber,
+        fireTime: ko.fireTime,
+        items: ko.items,
+      };
+    },
     [],
   );
 
@@ -49,7 +70,7 @@ export default function ExpeditorViewPage() {
           limit: 999_999_999,
         }),
         OrderService.getOrders({
-          serviceStatus: "PENDING",
+          serviceStatus: ServiceStatus.EATING,
           limit: 999_999_999,
         }),
       ]);
@@ -58,15 +79,15 @@ export default function ExpeditorViewPage() {
       const waitingOrders = ordersRes.data ?? [];
 
       const tableMap = new Map<string, string>(
-        waitingOrders.map(
-          (o: any) => [o.orderId, o.tableId] as [string, string],
-        ),
+        waitingOrders.map((o) => [String(o._id), String(o.tableId)]),
       );
       orderIdToTableIdRef.current = tableMap;
 
       const enriched: Ticket[] = kitchenOrders
         .filter((ko) => tableMap.has(ko.orderId))
-        .map((ko) => buildTicket(ko, tableMap.get(ko.orderId)!));
+        .map((ko) =>
+          buildTicket(ko, tableMap.get(ko.orderId)!, ko.tableNumber),
+        );
 
       setTickets(enriched);
     } catch (err) {
@@ -112,7 +133,25 @@ export default function ExpeditorViewPage() {
         }
 
         if (tableId !== undefined) {
-          setTickets((prev) => [...prev, buildTicket(newOrder, tableId!)]);
+          const nextTicket = buildTicket(newOrder, tableId!, newOrder.tableNumber);
+          setTickets((prev) => {
+            const existingIndex = prev.findIndex(
+              (ticket) =>
+                String(ticket.kitchenOrderId) === String(nextTicket.kitchenOrderId) ||
+                String(ticket.orderId) === String(nextTicket.orderId),
+            );
+
+            if (existingIndex === -1) {
+              return [...prev, nextTicket];
+            }
+
+            const next = [...prev];
+            next[existingIndex] = {
+              ...next[existingIndex],
+              ...nextTicket,
+            };
+            return next;
+          });
         }
       },
     );
@@ -128,15 +167,36 @@ export default function ExpeditorViewPage() {
             ) {
               return ticket;
             }
+
+            const updatedItems = ticket.items.map((item) =>
+              getItemIdentifier(item as KitchenOrderItemResponse & { _id?: string }) ===
+              String(completedItem.id ?? completedItem._id ?? "")
+                ? { ...item, cookingStatus: CookingStatus.COMPLETED }
+                : item,
+            );
+
             return {
               ...ticket,
-              items: ticket.items.map((item) =>
-                String(item.id) === String(completedItem.id || completedItem.id)
-                  ? { ...item, cookingStatus: CookingStatus.COMPLETED }
-                  : item,
-              ),
+              items: updatedItems,
             };
           }),
+        );
+      },
+    );
+
+    const unsubscribeOrderUpdated = OrderService.onOrderServiceStatusChanged(
+      (updatedOrder) => {
+        if (updatedOrder.serviceStatus !== ServiceStatus.FINISHED) {
+          return;
+        }
+
+        const updatedOrderId = String(
+          (updatedOrder as OrderResponse & { orderId?: string }).orderId ??
+            updatedOrder._id,
+        );
+
+        setTickets((prev) =>
+          prev.filter((ticket) => String(ticket.orderId) !== updatedOrderId),
         );
       },
     );
@@ -144,18 +204,24 @@ export default function ExpeditorViewPage() {
     return () => {
       unsubscribeKitchenCreated();
       unsubscribeItemCompleted();
+      unsubscribeOrderUpdated();
       KitchenService.disconnect();
     };
   }, [buildTicket]);
 
   // Bump ticket
   const handleBump = async (ticket: Ticket) => {
+    if (!ticket.kitchenOrderId) {
+      console.error("Missing kitchen order id on ticket", ticket);
+      return;
+    }
+
     if (bumpingIds.has(ticket.kitchenOrderId)) return;
     setBumpingIds((prev) => new Set(prev).add(ticket.kitchenOrderId));
     try {
       // Send socket event to bump kitchen order
       // We use SERVED to trigger the backend RabbitMQ pipeline to order-payment-service
-      KitchenService.bumpOrder(String(ticket.kitchenOrderId), {
+      await KitchenService.bumpOrder(String(ticket.kitchenOrderId), {
         status: KitchenOrderStatus.SERVED,
       });
       setTickets((prev) =>
@@ -251,26 +317,22 @@ export default function ExpeditorViewPage() {
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-4 mb-8">
-            {tickets.map((ticket) => {
+            {tickets.map((ticket, idx) => {
               const ready = canBump(ticket);
               const bumping = bumpingIds.has(ticket.kitchenOrderId);
 
               return (
                 <div
-                  key={ticket.kitchenOrderId}
+                  key={idx}
                   className={`bg-white rounded-xl border-t-4 overflow-hidden flex flex-col ${ready ? "border-green-400" : "border-amber-400"}`}
                 >
                   <div className="p-4 border-b border-irms-border">
                     <div className="flex items-start justify-between mb-1">
                       <span className="text-xl font-bold text-irms-text-primary">
-                        Table {ticket.tableId}
-                      </span>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-irms-surface text-irms-text-secondary">
-                        KO #{ticket.kitchenOrderId}
+                        Table {ticket.tableNumber}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-irms-text-secondary mt-1">
-                      <span>ORDER #{ticket.orderId}</span>
                       <span>
                         {new Date(ticket.fireTime).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -281,12 +343,12 @@ export default function ExpeditorViewPage() {
                   </div>
 
                   <div className="p-4 space-y-3 flex-1">
-                    {ticket.items.map((item) => {
+                    {ticket.items.map((item, idx) => {
                       const isReady =
                         item.cookingStatus === CookingStatus.COMPLETED;
                       return (
                         <div
-                          key={item.id}
+                          key={idx}
                           className="flex items-center justify-between gap-2"
                         >
                           <span className="text-sm font-semibold text-irms-text-primary truncate">

@@ -82,7 +82,7 @@ export default function TablesPage() {
           }
 
           const customer = activeOrder
-            ? customers?.find((c) => c.id === activeOrder.customerId)
+            ? customers?.find((c) => c._id === activeOrder.customerId)
             : null;
 
           const customerDisplay =

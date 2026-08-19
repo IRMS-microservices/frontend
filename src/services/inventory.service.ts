@@ -20,7 +20,7 @@ const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 let inventorySocket: Socket | null = null;
 
 function getInventorySocket(): Socket {
-    if (!inventorySocket || !inventorySocket.connected) {
+    if (!inventorySocket) {
         const token = sessionStorage.getItem('token');
         inventorySocket = io(GATEWAY_URL, {
             // Tell Socket.IO client to use the gateway-prefixed path
@@ -140,7 +140,14 @@ export const InventoryService = {
         callback: (payload: InventoryUpdatePayload) => void
     ): () => void {
         const s = getInventorySocket();
-        s.on('inventory:quantity_updated', callback);
-        return () => s.off('inventory:quantity_updated', callback);
+        const handler = (payload: any) => {
+            callback({
+                ...payload,
+                id: String(payload?.id ?? payload?._id ?? ''),
+                _id: String(payload?._id ?? payload?.id ?? ''),
+            });
+        };
+        s.on('inventory:quantity_updated', handler);
+        return () => s.off('inventory:quantity_updated', handler);
     },
 };

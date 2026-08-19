@@ -59,7 +59,8 @@ export default function OrderPage({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orderNotes, setOrderNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [customerId, setCustomerId] = useState<string | null>("0");
+  const [dishes, setDishes] = useState<DishResponse[]>([]);
+  const [customerId, setCustomerId] = useState<string | null>(null);
 
   // Load tableInfo & customerId from API
   useEffect(() => {
@@ -101,6 +102,7 @@ export default function OrderPage({
           limit: 999_999_999,
         });
         const dishes = dishesResponse.data;
+        setDishes(dishes);
         const grouped: Record<Category, MenuItem[]> = {
           [DishCategory.APPETIZER]: [],
           [DishCategory.MAIN_COURSE]: [],
@@ -116,7 +118,7 @@ export default function OrderPage({
               id: dish._id,
               name: dish.name,
               price: dish.price,
-              status: dish.available ? "IN STOCK" : "SOLD OUT",
+              status: dish.isAvailable ? "IN STOCK" : "SOLD OUT",
               image: dish.image,
               originalDish: dish,
             });
@@ -172,15 +174,27 @@ export default function OrderPage({
     if (cart.length === 0) return alert("Cart is empty!");
 
     setIsSubmitting(true);
+    console.log(customerId);
+    if (!customerId) {
+      router.push(`/server/tables/${tableId}`);
+      return;
+    }
     try {
       await OrderService.createOrder({
         tableId: tableId,
-        customerId: customerId || "0",
+        customerId: customerId,
         note: orderNotes,
-        items: cart.map((c) => ({
-          dishId: c.item.originalDish._id,
-          quantity: c.quantity,
-        })),
+        tableNumber: tableInfo?.tableNumber!,
+        items: cart.map((c) => {
+          return {
+            dishId: c.item.id,
+            quantity: c.quantity,
+            notes: c.notes,
+            price: c.item.price,
+            dishName: c.item.name,
+            imageUrl: c.item.image,
+          };
+        }),
       });
 
       localStorage.removeItem(`table_cart_${tableId}`);

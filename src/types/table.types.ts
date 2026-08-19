@@ -28,7 +28,6 @@ export interface UpdateTableRequest {
   status?: TableStatus;
   currentGuestsNumber?: number;
   currentGuestId?: string | null;
-  customerId?: string;
 }
 
 export interface TableQuery {

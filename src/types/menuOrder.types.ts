@@ -23,23 +23,24 @@ export interface DishResponse {
   name: string;
   category: DishCategory;
   price: number;
-  available: boolean;
+  isAvailable: boolean;
   image: string;
 }
 
 export interface OrderItemResponse {
-  id: number;
+  _id: string;
   dishId: string;
   dishName: string;
   quantity: number;
-  salePrice: number;
+  price: number;
   notes: string | null;
 }
 
 export interface OrderResponse {
-  id: number;
+  _id: string;
   restaurantId: string;
   tableId: string;
+  tableNumber: number;
   customerId: string;
   totalAmount: number;
   paymentStatus: PaymentStatus;
@@ -58,6 +59,7 @@ export interface OrderItemRequest {
 
 export interface CreateOrderRequest {
   tableId: string;
+  tableNumber: number;
   customerId: string;
   note?: string;
   items: OrderItemRequest[];
@@ -81,6 +83,7 @@ export interface OrderQuery {
 
 export interface UpdateOrderRequest {
   tableId?: string;
+  tableNumber?: number;
   customerId?: string;
   customerName?: string;
   customerPhone?: string;

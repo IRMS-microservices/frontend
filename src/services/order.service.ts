@@ -7,7 +7,7 @@ const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 let orderSocket: Socket | null = null;
 
 function getOrderSocket(): Socket {
-    if (!orderSocket || !orderSocket.connected) {
+    if (!orderSocket) {
         const token = sessionStorage.getItem('token');
         orderSocket = io(GATEWAY_URL, {
             path: '/socket.io/orders/', // Ensure this matches your gateway or service routing

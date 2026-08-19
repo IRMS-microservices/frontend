@@ -76,7 +76,7 @@ const buildDraftFromDish = (dish: DishResponse): MenuDraft => ({
   category: dish.category,
   basePrice: String(dish.price),
   imageUrl: dish.image,
-  available: dish.available,
+  available: dish.isAvailable,
   yieldText: "1 Portion",
   prepTime: "15m",
   cookTime: "5m",
@@ -383,7 +383,7 @@ export default function AdminMenuPage() {
                                 type="button"
                                 onClick={async (event) => {
                                   event.stopPropagation();
-                                  const nextAvailable = !dish.available;
+                                  const nextAvailable = !dish.isAvailable;
                                   const response = await MenuService.updateDish(
                                     String(dish._id),
                                     {
@@ -410,15 +410,15 @@ export default function AdminMenuPage() {
                                   }
                                 }}
                                 className={`relative inline-flex h-7 w-12 items-center rounded-full transition ${
-                                  dish.available
+                                  dish.isAvailable
                                     ? "bg-orange-500"
                                     : "bg-gray-300"
                                 }`}
-                                aria-pressed={dish.available}
+                                aria-pressed={dish.isAvailable}
                               >
                                 <span
                                   className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-                                    dish.available
+                                    dish.isAvailable
                                       ? "translate-x-6"
                                       : "translate-x-1"
                                   }`}
