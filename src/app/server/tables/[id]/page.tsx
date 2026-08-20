@@ -131,9 +131,8 @@ export default function TableDetailPage({
         let customerData = null;
         if (currentGuestId) {
           try {
-            const customerRes = await CustomerService.getCustomerById(
-              currentGuestId,
-            );
+            const customerRes =
+              await CustomerService.getCustomerById(currentGuestId);
             customerData = customerRes.data;
           } catch (e) {
             console.error("Failed to fetch customer", e);
@@ -145,7 +144,7 @@ export default function TableDetailPage({
           setTableState("assigned");
 
           const customerDisplay = customerData
-            ? customerData.gender === "Male"
+            ? customerData.gender === "MALE"
               ? "Mr. " + customerData.name
               : "Ms. " + customerData.name
             : null;
@@ -449,4 +448,3 @@ export default function TableDetailPage({
     </div>
   );
 }
-

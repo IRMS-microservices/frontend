@@ -179,6 +179,17 @@ export const KitchenService = {
     },
 
     /**
+     * Subscribe to 'kitchen_order_served' events.
+     */
+    onKitchenOrderServed(
+        callback: (order: any) => void
+    ): () => void {
+        const s = getKitchenSocket();
+        s.on('kitchen_order_served', callback);
+        return () => s.off('kitchen_order_served', callback);
+    },
+
+    /**
      * Subscribe to the 'joined' acknowledgment event.
      * Fired by the backend after a successful room join.
      */

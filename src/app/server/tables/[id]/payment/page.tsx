@@ -12,7 +12,11 @@ import {
   ServiceStatus,
 } from "@/types/menuOrder.types";
 import { CustomerService } from "@/services/customer.service";
-import { CookingStatus, KitchenOrderItemResponse, KitchenOrderResponse } from "@/types/kitchen.types";
+import {
+  CookingStatus,
+  KitchenOrderItemResponse,
+  KitchenOrderResponse,
+} from "@/types/kitchen.types";
 import { PaymentService } from "@/services/payment.service";
 import { getPaymentAdapterUI } from "./adapters/PaymentAdapterRegistry";
 import { TableResponse } from "@/types/table.types";
@@ -114,7 +118,9 @@ export default function PaymentPage({
   );
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [tableInfo, setTableInfo] = useState<TableResponse | null>(null);
-  const [kitchenOrder, setKitchenOrder] = useState<KitchenOrderResponse | null>(null);
+  const [kitchenOrder, setKitchenOrder] = useState<KitchenOrderResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -158,7 +164,6 @@ export default function PaymentPage({
     fetchKitchenOrder();
   }, [activeOrder?._id]);
 
-
   useEffect(() => {
     const fetchCustomer = async () => {
       let cid = activeOrder?.customerId ?? tableInfo?.currentGuestId ?? null;
@@ -173,7 +178,7 @@ export default function PaymentPage({
           if (response.success) {
             const customerData = response.data;
             const formattedName =
-              customerData.gender === "Male"
+              customerData.gender === "MALE"
                 ? `Mr. ${customerData.name}`
                 : `Ms. ${customerData.name}`;
             setCustomerName(formattedName);
@@ -195,7 +200,10 @@ export default function PaymentPage({
 
     const unsubscribeItemCompleted = KitchenService.onItemCompleted(
       (completedItem: KitchenOrderItemResponse & { orderId?: string }) => {
-        if (completedItem.orderId && String(completedItem.orderId) !== String(activeOrder._id)) {
+        if (
+          completedItem.orderId &&
+          String(completedItem.orderId) !== String(activeOrder._id)
+        ) {
           return;
         }
 
@@ -291,26 +299,20 @@ export default function PaymentPage({
     fetchTableInfo();
   }, [tableId]);
 
-  // ── Real-time: listen for service-status changes from the kitchen ──
+  // Real-time: listen for kitchen order served events
   useEffect(() => {
-    OrderService.connect();
+    KitchenService.connect();
+    KitchenService.joinRoom('expeditor');
 
-    const unsubscribe = OrderService.onOrderServiceStatusChanged(
-      (updatedOrder: OrderResponse) => {
+    const unsubscribe = KitchenService.onKitchenOrderServed(
+      (servedKitchenOrder: any) => {
         // Only update if it's for the current table
-        if (updatedOrder.tableId !== tableId) return;
+        if (servedKitchenOrder.tableId !== tableId) return;
 
         setActiveOrder((prev) => {
-          if (prev && prev._id === updatedOrder._id) {
-            return { ...prev, ...updatedOrder };
-          }
-          // If no active order yet, pick up this one if it's in a relevant status
-          if (
-            !prev &&
-            (updatedOrder.serviceStatus === ServiceStatus.WAITING ||
-              updatedOrder.serviceStatus === ServiceStatus.FINISHED)
-          ) {
-            return updatedOrder;
+          if (prev && prev._id === servedKitchenOrder.orderId) {
+            // Optimistically update the service status to FINISHED
+            return { ...prev, serviceStatus: ServiceStatus.FINISHED };
           }
           return prev;
         });
@@ -319,9 +321,10 @@ export default function PaymentPage({
 
     return () => {
       unsubscribe();
-      OrderService.disconnect();
+      // Note: intentionally not calling KitchenService.disconnect() here 
+      // because other effects might be using the shared socket.
     };
-  }, []);
+  }, [tableId]);
 
   const subtotal = activeOrder
     ? activeOrder.items.reduce(
@@ -364,7 +367,6 @@ export default function PaymentPage({
       ? "READY"
       : "COOKING";
   };
-
 
   const handleCompletePaymentClick = () => {
     if (!activeOrder) return;

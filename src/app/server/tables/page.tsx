@@ -87,7 +87,7 @@ export default function TablesPage() {
             : null;
 
           const customerDisplay = customer
-            ? customer.gender === "Male"
+            ? customer.gender === "MALE"
               ? "Mr. " + customer.name
               : "Ms. " + customer.name
             : null;
@@ -107,7 +107,9 @@ export default function TablesPage() {
             seatedGuests: bt.currentGuestsNumber,
             status: status,
             time: activeOrder ? timeString : "",
-            guest: customerDisplay ?? (activeOrder ? "Active Order" : "Ready for Service"),
+            guest:
+              customerDisplay ??
+              (activeOrder ? "Active Order" : "Ready for Service"),
             hasAlert: bt.status === "WAITING",
           };
         });
@@ -262,6 +264,3 @@ export default function TablesPage() {
     </div>
   );
 }
-
-
-
