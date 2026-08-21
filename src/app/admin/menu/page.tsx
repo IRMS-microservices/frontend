@@ -174,9 +174,9 @@ export default function AdminMenuPage() {
       const payload = {
         name: draft.name,
         category: draft.category,
-        basePrice: Number(draft.basePrice),
-        available: draft.available,
-        imageUrl: draft.imageUrl,
+        price: Number(draft.basePrice), // also fix basePrice to price
+        isAvailable: draft.available,
+        image: draft.imageUrl, // also fix imageUrl to image
         yieldText: draft.yieldText,
         prepTime: draft.prepTime,
         cookTime: draft.cookTime,
@@ -387,7 +387,7 @@ export default function AdminMenuPage() {
                                   const response = await MenuService.updateDish(
                                     String(dish._id),
                                     {
-                                      available: nextAvailable,
+                                      isAvailable: nextAvailable,
                                     },
                                   );
                                   if (response.success) {
@@ -396,7 +396,7 @@ export default function AdminMenuPage() {
                                         item._id === dish._id
                                           ? {
                                               ...item,
-                                              available: nextAvailable,
+                                              isAvailable: nextAvailable,
                                             }
                                           : item,
                                       ),

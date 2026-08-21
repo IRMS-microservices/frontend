@@ -141,6 +141,38 @@ export default function OrderPage({
     fetchMenu();
   }, []);
 
+  // Listen to live dish status changes
+  useEffect(() => {
+    MenuService.connect();
+    
+    const unsubscribe = MenuService.onDishStatusChanged((payload) => {
+      setMenuData((prev) => {
+        const newData = { ...prev };
+        let hasChanges = false;
+        
+        (Object.keys(newData) as Category[]).forEach((cat) => {
+          newData[cat] = newData[cat].map((item) => {
+            if (item.id === payload.id) {
+              const newStatus = payload.isAvailable ? "IN STOCK" : "SOLD OUT";
+              if (item.status !== newStatus) {
+                hasChanges = true;
+                return { ...item, status: newStatus };
+              }
+            }
+            return item;
+          });
+        });
+        
+        return hasChanges ? newData : prev;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+      MenuService.disconnect();
+    };
+  }, []);
+
   const addToCart = (item: MenuItem) => {
     setCart((prev) => {
       const existing = prev.find((c) => c.item.id === item.id);
