@@ -35,17 +35,17 @@ export const ZaloPayAdapterUI: React.FC<PaymentAdapterProps> = ({
 
         const res = await PaymentService.createPaymentOrder({
           orderId: order._id,
-          amount: grandTotal,
+          amount: Math.round(grandTotal),
           description: `Thanh toan don hang #${order._id}`,
           paymentMethodId,
           restaurantId: order.restaurantId,
         });
 
         if (res.success && res.data) {
-          if (res.data.qrCode) {
-            setQrImageUrl(res.data.qrCode);
-          } else if (res.data.paymentUrl) {
+          if (res.data.paymentUrl) {
             setQrValue(res.data.paymentUrl);
+          } else if (res.data.qrCode) {
+            setQrImageUrl(res.data.qrCode);
           } else {
             setError(
               res.data.rawResponse?.toString() ||
